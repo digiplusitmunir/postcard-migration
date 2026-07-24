@@ -1,0 +1,59 @@
+site_name: Postcard Migration Docs
+site_description: Strapi → PostgreSQL/Prisma migration documentation for Postcard Travel Club
+
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.tabs.link
+
+hooks:
+  - docs_hooks.py
+
+plugins:
+  - search
+  - mkdocs-jupyter:
+      include_source: true
+      execute: false
+
+nav:
+  - Home: index.md
+  - Prerequisites:
+      - PostgreSQL Lifecycle: prerequisites/postgresql-lifecycle.md
+      - Prisma Guide: prerequisites/prisma-guide.md
+  - Get Started:
+      - Initialisation: get-started/initialisation.md
+      - Seed Scripts: get-started/seed-scripts.md
+      - Migration Workflow: get-started/migration-workflow.md
+  - Migrations:
+      - migrations/index.md
+      - 1. Geo Migration: migrations/geo-migration.md
+      - "Geo Migration — Notebook": migrations/notebooks/geo_migration.ipynb
+      - 2. User Migration: migrations/user-migration.md
+      - "User Migration — Notebook": migrations/notebooks/user_migration.ipynb
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - tables

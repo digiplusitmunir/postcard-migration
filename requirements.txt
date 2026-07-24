@@ -1,0 +1,7 @@
+mkdocs
+mkdocs-material
+mkdocs-jupyter
+psycopg[binary]
+python-dotenv
+requests
+jupyterlab

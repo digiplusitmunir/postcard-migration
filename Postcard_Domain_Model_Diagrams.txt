@@ -1,0 +1,725 @@
+﻿Postcard Travel Club — Domain Model Diagrams
+POSTCARD TRAVEL CLUB
+Domain Model — Diagrams & Explanations
+Collection / Subcollection / CollectionCluster architecture
+Date: 9 July 2026
+________________
+
+
+Overview
+This document captures the finalized domain model for Postcard Travel Club's content architecture. Eight diagrams cover the full model: the content hierarchy, the geo tier, classification, the actor/user layer, the generic Circle relationship entity, Memory/Analytics, and a consolidated master overview. Each diagram is on its own page, followed by a full field-level schema section for every entity involved.
+The model follows one governing principle: every classification, relationship, and grouping is a relation or join table, not a hardcoded column, so new dimensions are additive — no restructuring required.
+Figure 1. Collection Hierarchy
+The core content hierarchy. CollectionType is the category (Properties, Restaurants, Events, Shopping, Destination Expert). Collection is one specific instance — a named Property, Restaurant, Event, or Shop. Postcard is the atomic content unit.
+Sub-type classification (Boutique Stays, Signature Experiences, Cuisine) is handled entirely through FacetAssignment (Figure 4), not a separate Category entity — an earlier draft of this model had a dedicated Category/CollectionCategory pair that turned out to duplicate exactly what FacetType/FacetValue already does, so it was folded in rather than kept as a second mechanism doing the same job.
+* CollectionType → Collection is a straightforward one-to-many.
+* Collection → Postcard is nullable: only CollectionTypes with has_dedicated_collection = true (Properties, Destination Expert) wrap their postcards in a Collection. Restaurants/Events/Shopping postcards stand alone as their own entry, with no Collection layer above them.
+* FacetAssignment applies polymorphically to Collection (shown here) or directly to Postcard (shown in Figure 4) — the same mechanism covers both.
+ Collection Hierarchy 
+
+Figure 1 — CollectionType, Collection, and Postcard, with sub-type classification handled via FacetAssignment.
+Figure 2. Subcollection & CollectionCluster
+Subcollection (Journey) and CollectionCluster (City Guide, Partner Affiliation) both build on top of the Figure 1 hierarchy rather than replacing it.
+A Subcollection always belongs to exactly one Collection — e.g. a Journey is a curated, ordered subset of postcards pulled from one specific Property's own postcards, never mixed across properties (multi-property journeys remain a possible future extension, not built now).
+* SubcollectionPostcard is an ordered join carrying sequence_order — a manually chosen display position (Day 1, Day 2…), not a calendar date. Real calendar dates are assigned later, per member, when a Journey is actually booked.
+* CollectionCluster groups entries polymorphically via CollectionClusterEntry, which can point at either a Collection (a Property, if one ever joins a cluster) or a Postcard directly (the common case for Restaurants/Events/Shopping, since they have no Collection wrapper of their own).
+* Membership in a cluster is explicit editorial curation, not an automatic filter — consistent with the platform's curation-over-volume principle.
+ Subcollection & CollectionCluster 
+
+Figure 2 — Subcollection (Journey) and CollectionCluster (City Guide / Partner Affiliation).
+Figure 3. Geo Hierarchy
+A four-tier location hierarchy: Country → Region → City → Locality. This exists specifically to prevent name collisions that caused real problems in the legacy system — city names repeating across different countries, and locality/neighborhood names repeating across different cities (e.g. “Indira Nagar” exists in both Mumbai and Bangalore).
+* Each tier is uniquely scoped to its parent, not globally unique: Region is unique by (name, country_id), City by (name, region_id), Locality by (name, city_id).
+* This tier is reused everywhere location matters — Postcard, Collection, CollectionCluster, User, and Memory all reference it directly rather than storing free-text location strings.
+ Geo Hierarchy 
+
+Figure 3 — Country, Region, City, Locality, each uniquely scoped to its parent.
+Figure 4. Classification (Facets & Tags)
+FacetType/FacetValue/FacetAssignment is the single classification mechanism for the whole platform — it replaced two originally hardcoded fields (category and environment) that broke the moment a second CollectionType (Events) needed different classification dimensions than the one they were designed for (Properties), and it also absorbed a separately-designed Category/CollectionCategory pair once that turned out to be the same pattern applied a second time.
+A FacetType (“Property Type”, “Experience Theme”, “Cuisine”) can be scoped to a specific CollectionType and can allow either single or multiple values. Boutique Stays and Signature Experiences are FacetValues under “Property Type”; Indian and Italian are FacetValues under “Cuisine”. Adding a new classification dimension in the future is just a new FacetType row — no schema change.
+* FacetAssignment is polymorphic, applying to either a Collection or a Postcard, matching the same postcard-as-entry split described in Figure 1.
+* Tag remains its own separate, simpler mechanism — granular, always-multi-select, postcard-level features (stargazing, infinity pool) that sit a level below whatever a Facet classifies.
+ Classification (Facets & Tags) 
+
+Figure 4 — FacetType, FacetValue, FacetAssignment, and Tag — the single classification mechanism, covering both sub-typing and thematic tagging.
+Figure 5. Actors: User, UserType, UserRole, Company
+A single unified User table (not split by Member/Staff/Partner) matches how the platform already works and preserves identity continuity when someone's role changes — a Member becoming a Destination Expert, for example, without migrating their history to a different table.
+UserRole replaces a single user_type_id column, because one person can hold more than one role — a Partner who is also a personal Member, or a Partner managing listings for two different Companies.
+* UserRole.company_id is nullable and only populated for partner-type roles, and can differ across multiple roles held by the same person.
+* UserRole.manager_user_id is a self-referential link supporting an org-chart hierarchy (an Editor's role reports to an Editor-in-Chief's role), recursive by nature since it just points back at User.
+ Actors: User, UserType, UserRole, Company 
+
+Figure 5 — User, UserType, UserRole (with manager_user_id), and Company.
+Figure 6. Circle — the universal relationship layer
+Circle is the single mechanism for every “a User relates to X” case on the platform. It replaces six separate, duplicated legacy entities (Bookmark, FollowAlbum, FollowCompany, FollowAffiliate, FollowTag, FollowCityGuide) plus a standalone User-follows-User entity — all of which turned out to be the same shape repeated per type.
+owned_type is polymorphic across every ownable/followable entity in the system, including another User (following a person, not just content).
+* relationship distinguishes what kind of connection this is: author and assigned_staff cover content stewardship — previously separate columns duplicated across every content entity; owner covers business/commercial ownership (a Partner's properties, queryable directly by user_id); bookmark and booked cover personal member engagement, with booked additionally carrying source_enquiry_id and sequence_date for a booked Journey's personal fork.
+* This single table, properly indexed on (user_id, relationship, owned_type), answers every variant of “show me everything connected to this person” in one place.
+ Circle — the universal relationship layer 
+
+Figure 6 — Circle, connecting a User to any of seven ownable/followable entity types.
+Figure 7. Memory & Persona/Analytics
+Memory is the member's personal narrative layer — photos, notes, and travel companions attached to a specific bookmarked Postcard, or standing alone if it doesn't map to any curated content at all. It is deliberately distinct from Circle's booked relationship: Circle tracks the structural fact of what was booked and when; Memory carries the personal story on top of that.
+UserEvent and UserPersona formalize behavioral tracking that was previously just a vague “feeds personalization” line — now with real, queryable schema.
+* Memory.postcard_id is nullable — only a Postcard can be the subject, since a Memory is about a specific personal experience, not an abstract container.
+* UserEvent is the raw, append-only behavioral log. UserPersona is the periodically recomputed, derived profile — an ML embedding plus scalar signals like price_affinity.
+* UserPersonaTag is a proper weighted join, not a JSON blob, so it can be queried in both directions: a member's own top interests, and every member interested in a given tag for targeting.
+ Memory & Persona/Analytics 
+
+Figure 7 — Memory (personal experience) and the UserEvent / UserPersona / UserPersonaTag analytics layer.
+Figure 8. Master Overview — All Entities & Relationships
+A single consolidated view of every entity across the seven preceding diagrams, grouped into the same six clusters plus the Circle relationship hub. This is a relationship map, not a substitute for the detailed figures — refer back to Figures 1–7 and the Entity Schemas section for field-level detail.
+* Geo Hierarchy is shown as its own self-contained chain (Country → Region → City → Locality); its many inbound references from Postcard, Collection, CollectionCluster, User, and Memory are omitted here to keep the diagram legible — see the individual figures for those connections.
+* Circle sits at the center as the universal relationship hub between User and everything ownable/followable (Postcard, Collection, Subcollection, CollectionCluster, Tag, Company, and User itself).
+* The two dense clusters — Content Hierarchy and Subcollection & Cluster — are where most of the platform's actual browsing and curation logic lives; Classification and Memory & Analytics layer on top of them without altering their shape.
+ Master Overview — All Entities & Relationships 
+
+Figure 8 — Master overview of all entities and relationships in the domain model.
+Entity Schemas
+Full field-level schema for every entity shown in the figures above, grouped the same way.
+Entity Schemas — Content Hierarchy
+CollectionType
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	name
+	string
+	Properties, Restaurants, Events, Shopping, Destination Expert
+	slug
+	string
+	
+
+	description
+	text
+	
+
+	icon
+	string
+	
+
+	has_dedicated_collection
+	boolean
+	true only for types with a real Collection layer (Properties, Destination Expert)
+	priority
+	integer
+	display order
+	Collection
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	collection_type_id
+	FK -> CollectionType
+	
+
+	name / intro / story / slug
+	string / text / richtext / uid
+	
+
+	cover_media_id
+	FK -> Media
+	
+
+	seo
+	embedded component
+	meta title, description, OG image
+	is_featured
+	boolean
+	
+
+	priority
+	integer
+	
+
+	country_id / region_id / city_id / locality_id
+	FK -> geo tier
+	
+
+	location
+	embedded (address, lat, lng, google_place_id)
+	
+
+	managed_by_company_id
+	FK -> Company
+	the corporate/billing entity, if any
+	website / media_kit / additional_info / sustainability
+	string / string / text / text
+	
+
+	status
+	enum: draft / assigned / submit / rework / live
+	the real production editorial workflow
+	(sub-type)
+	via FacetAssignment
+	Boutique Stays / Signature Experiences / Cuisine now live as FacetValues, not a dedicated Category entity - see Classification group
+	Postcard
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	name / intro / slug / story
+	string / text / uid / richtext
+	
+
+	collection_type_id
+	FK -> CollectionType
+	always populated
+	collection_id
+	FK -> Collection, nullable
+	populated only when has_dedicated_collection = true
+	country_id / region_id / city_id / locality_id
+	FK -> geo tier, nullable
+	set directly when collection_id is null
+	location
+	embedded, nullable
+	set directly for Restaurants/Shopping postcards
+	event_details
+	embedded, nullable
+	start_date, end_date, is_recurring, recurrence_rule, venue - Events only
+	tags
+	M2M -> Tag
+	
+
+	copyright
+	string
+	
+
+	is_featured / priority
+	boolean / integer
+	
+
+	cover_media_id
+	FK -> Media
+	
+
+	status / published_at
+	enum / datetime
+	
+
+	Entity Schemas — Subcollection & CollectionCluster
+SubcollectionType
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	collection_type_id
+	FK -> CollectionType
+	which CollectionType this subgrouping applies to (Properties -> Journey)
+	name / slug / description / priority
+	string / string / text / integer
+	
+
+	Subcollection
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	subcollection_type_id
+	FK -> SubcollectionType
+	
+
+	collection_id
+	FK -> Collection, required
+	the one Property this Journey belongs to
+	name / intro / story / slug
+	string / text / richtext / uid
+	
+
+	tour_info
+	richtext
+	
+
+	price
+	decimal
+	consolidated from avgPricePerPerson + pricesStartingAt
+	number_of_nights
+	integer
+	fixed from legacy string type
+	guests_min / guests_max
+	integer
+	replaces the numberOfGuestsTitle/Value label-value hack
+	best_months
+	embedded, repeatable
+	
+
+	managed_by_company_id
+	FK -> Company
+	
+
+	status
+	enum
+	
+
+	SubcollectionPostcard (join)
+Field
+	Type / Reference
+	Notes
+	subcollection_id
+	FK -> Subcollection
+	
+
+	postcard_id
+	FK -> Postcard
+	must belong to the same collection_id as the parent Subcollection
+	sequence_order
+	integer
+	manually set display position (Day 1, Day 2...), not a calendar date
+	CollectionClusterType
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	name
+	string
+	City Guide, Partner Affiliation
+	slug / description / priority
+	string / text / integer
+	
+
+	CollectionCluster
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	cluster_type_id
+	FK -> CollectionClusterType
+	
+
+	name / slug / intro / story
+	string / uid / text / richtext
+	
+
+	country_id / region_id / city_id / locality_id
+	FK -> geo tier, nullable
+	meaningful for City Guide
+	managed_by_company_id
+	FK -> Company, nullable
+	meaningful for Partner Affiliation
+	status
+	enum
+	
+
+	CollectionClusterEntry (join)
+Field
+	Type / Reference
+	Notes
+	cluster_id
+	FK -> CollectionCluster
+	
+
+	entry_type
+	enum: collection / postcard
+	which kind of entry this is
+	entry_id
+	polymorphic FK -> Collection.id or Postcard.id
+	
+
+	priority
+	integer
+	curator-controlled display order
+	Entity Schemas — Geo Hierarchy
+Country
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	name / slug
+	string / uid
+	
+
+	Region
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	country_id
+	FK -> Country
+	
+
+	name / slug
+	string / uid
+	Unique(name, country_id)
+	City
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	region_id
+	FK -> Region
+	
+
+	country_id
+	FK -> Country
+	denormalized for fast queries without a join through Region
+	name / slug
+	string / uid
+	Unique(name, region_id)
+	lat / lng
+	decimal
+	centroid, for map default zoom
+	Locality
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	city_id
+	FK -> City
+	
+
+	name / slug
+	string / uid
+	Unique(name, city_id)
+	lat / lng
+	decimal, optional
+	centroid
+	Entity Schemas — Classification
+FacetType
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	name
+	string
+	Property Type, Experience Theme, Cuisine...
+	slug
+	string
+	
+
+	applies_to_collection_type_id
+	FK -> CollectionType, nullable
+	scopes relevance; null = applies broadly
+	allows_multiple
+	boolean
+	single-select (Property Type) vs multi-select (Cuisine)
+	FacetValue
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	facet_type_id
+	FK -> FacetType
+	
+
+	name / slug
+	string / uid
+	e.g. Glamping, Cultural, Indian, Boutique Stays, Signature Experiences
+	FacetAssignment (join)
+Field
+	Type / Reference
+	Notes
+	owned_type
+	enum: collection / postcard
+	
+
+	owned_id
+	polymorphic
+	
+
+	facet_value_id
+	FK -> FacetValue
+	this is now the single mechanism for sub-type classification - the earlier separate Category/CollectionCategory entities were removed as duplicates of this
+	Tag
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	name / slug
+	string / uid
+	granular postcard-level features: stargazing, infinity pool
+	Entity Schemas — Actors
+Company
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	name / slug
+	string / uid
+	
+
+	contact_email / contact_phone / website
+	string
+	
+
+	status
+	enum: pending / active / suspended
+	
+
+	UserType
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	name / slug
+	string / uid
+	Member, Partner, Staff Editor, Admin
+	is_default
+	boolean
+	ordinary member
+	is_creator
+	boolean
+	can author/submit content
+	is_admin
+	boolean
+	admin-level access
+	User
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	username / email / full_name / first_name / last_name
+	string
+	
+
+	password_hash / auth_provider / provider_id
+	string
+	replaces Strapi's users-permissions plugin
+	email_verified / is_blocked
+	boolean
+	
+
+	profile_pic_id / cover_image_id
+	FK -> Media
+	
+
+	bio / social / seo / tracking
+	richtext / component / component / component
+	
+
+	is_featured / priority
+	boolean / integer
+	for public creator/destination-expert profiles
+	country_id / region_id / city_id / locality_id
+	FK -> geo tier
+	
+
+	tier
+	enum: free / star_life, nullable
+	Member-specific
+	UserRole
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	user_id
+	FK -> User
+	
+
+	user_type_id
+	FK -> UserType
+	
+
+	company_id
+	FK -> Company, nullable
+	only for partner-type roles; supports multiple Companies per person
+	manager_user_id
+	FK -> User, nullable
+	self-referential org hierarchy (Editor -> Editor-in-Chief)
+	granted_at / status
+	datetime / enum
+	
+
+	Entity Schemas — Circle
+Circle
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	user_id
+	FK -> User
+	
+
+	owned_type
+	enum: postcard / collection / subcollection / collection_cluster / tag / company / user
+	polymorphic across every ownable/followable type
+	owned_id
+	polymorphic
+	
+
+	relationship
+	enum: author / assigned_staff / owner / bookmark / booked
+	author/assigned_staff = content stewardship; owner = business ownership; bookmark/booked = member engagement
+	source_enquiry_id
+	FK -> Enquiry, nullable
+	only when relationship = booked
+	sequence_date
+	date, nullable
+	only for booked postcards inside a forked Journey
+	added_at
+	datetime
+	
+
+	Entity Schemas — Memory & Analytics
+Memory
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	user_id
+	FK -> User
+	creator/owner of the memory
+	postcard_id
+	FK -> Postcard, nullable
+	null = standalone memory not tied to any postcard
+	name / slug / intro
+	string / uid / text
+	
+
+	memory_date
+	date, nullable
+	when the experience happened
+	country_id / region_id / city_id / locality_id
+	FK -> geo tier, nullable
+	copied from the postcard at creation, or set manually if standalone
+	gallery
+	1:N/M2N -> Media
+	multiple photos/videos
+	external_url
+	string, nullable
+	
+
+	tagged_user_ids
+	M2M -> User
+	other people tagged in this memory
+	share_type
+	enum: private / public / selected
+	'selected' = visible only to tagged_user_ids
+	created_at
+	datetime
+	when logged, distinct from memory_date
+	UserEvent
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	user_id
+	FK -> User
+	
+
+	event_type
+	enum: postcard_view / collection_view / search / bookmark / enquiry_submitted / memory_created / tag_click
+	
+
+	subject_type / subject_id
+	enum / polymorphic, nullable
+	
+
+	search_query
+	string, nullable
+	populated when event_type = search
+	metadata
+	json, nullable
+	
+
+	occurred_at
+	datetime
+	
+
+	UserPersona
+Field
+	Type / Reference
+	Notes
+	id
+	PK
+	
+
+	user_id
+	FK -> User, unique
+	
+
+	preference_embedding
+	vector
+	ML similarity vector, recomputed periodically
+	price_affinity
+	enum: budget / mid / luxury, nullable
+	
+
+	last_computed_at
+	datetime
+	
+
+	UserPersonaTag
+Field
+	Type / Reference
+	Notes
+	user_id
+	FK -> User
+	
+
+	tag_id
+	FK -> Tag
+	
+
+	weight
+	decimal
+	queryable both ways: a member's top interests, or all members interested in a given tag
+	updated_at
+	datetime
+	
+
+	
+
+Page

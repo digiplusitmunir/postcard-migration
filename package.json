@@ -1,0 +1,23 @@
+{
+  "name": "postcard-migration",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Schema management (Prisma) for the postcardv2 migration. Data scripts live in scripts/ (Python).",
+  "scripts": {
+    "validate": "prisma validate",
+    "migrate": "prisma migrate dev",
+    "migrate:status": "prisma migrate status",
+    "migrate:reset": "prisma migrate reset",
+    "migrate:deploy": "prisma migrate deploy",
+    "push": "prisma db push",
+    "studio": "prisma studio",
+    "generate": "prisma generate"
+  },
+  "devDependencies": {
+    "prisma": "^7.0.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^7.0.0",
+    "dotenv": "^17.0.0"
+  }
+}
