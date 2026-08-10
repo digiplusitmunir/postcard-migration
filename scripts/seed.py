@@ -6,13 +6,8 @@ Each table gets its real known values or 2-3 samples; extend the lists as
 the platform grows.
 
   collection_types          Properties, Restaurants, Events, ...
-  user_types                Member, Partner, Staff Editor, Admin  (the roles
-                            a UserRole row can point at — user_roles itself
-                            is written by the app/user-migration, not here)
   subcollection_types       Journey (under Properties)
   collection_cluster_types  City Guide, Partner Affiliation
-  facet_types               Property Type, Experience Theme, Cuisine
-  facet_values              starter values per facet type
   tags                      sample postcard-level feature tags
   response_types            contact_form, feedback, newsletter_signup
   response_fields           field definitions per response type
@@ -54,42 +49,18 @@ SUBCOLLECTION_TYPES = [
 # name, slug, priority
 COLLECTION_CLUSTER_TYPES = [
     ("City Guide",          "city-guide",          1),
-    ("Partner Affiliation", "partner-affiliation", 2),
 ]
 
-# -----------------------------------------------------------------------------
-# Actor types (role definitions — NOT user_roles rows, the app creates those)
-# -----------------------------------------------------------------------------
-
-# name, slug, is_default, is_creator, is_admin
-USER_TYPES = [
-    ("Member",       "member",       True,  False, False),
-    ("Partner",      "partner",      False, True,  False),
-    ("Staff Editor", "staff-editor", False, True,  False),
-    ("Admin",        "admin",        False, False, True),
-]
+# NOTE: user_types are NOT seeded here — they are migrated from the legacy CMS
+# by notebooks/media_usertypes_companies_migration.ipynb.
 
 # -----------------------------------------------------------------------------
 # Classification (domain model, Figure 4)
 # -----------------------------------------------------------------------------
 
-# name, slug, applies_to collection_type slug (None = applies broadly), allows_multiple
-FACET_TYPES = [
-    ("Property Type",    "property-type",    "properties",  False),
-    ("Experience Theme", "experience-theme", None,          True),
-    ("Cuisine",          "cuisine",          "restaurants", True),
-]
-
-# facet_type_slug, name, slug
-FACET_VALUES = [
-    ("property-type",    "Boutique Stays",        "boutique-stays"),
-    ("property-type",    "Signature Experiences", "signature-experiences"),
-    ("property-type",    "Glamping",              "glamping"),
-    ("experience-theme", "Cultural",              "cultural"),
-    ("experience-theme", "Wellness",              "wellness"),
-    ("cuisine",          "Indian",                "indian"),
-    ("cuisine",          "Italian",               "italian"),
-]
+# NOTE: facet_types / facet_values are NOT seeded here — they are migrated from
+# the legacy CMS: Tag -> 'Experience' (notebooks/tags_facet_migration.ipynb);
+# Category / Environment / Tag-group facets follow in their own tracker rows.
 
 # name, slug — granular postcard-level feature tags (samples)
 TAGS = [
@@ -106,8 +77,6 @@ TAGS = [
 # name, slug, description
 RESPONSE_TYPES = [
     ("contact_form",      "contact-form",      "Contact Us form (legacy ContactUs)"),
-    ("feedback",          "feedback",          "General feedback form"),
-    ("newsletter_signup", "newsletter-signup", "Newsletter subscription"),
 ]
 
 # response_type slug, field_name, field_type, is_required, order
@@ -118,9 +87,6 @@ RESPONSE_FIELDS = [
     ("contact-form",      "country_code", "number",   False, 4),
     ("contact-form",      "phone_number", "phone",    False, 5),
     ("contact-form",      "question",     "textarea", True,  6),
-    ("feedback",          "message",      "textarea", True,  1),
-    ("feedback",          "rating",       "number",   False, 2),
-    ("newsletter-signup", "email",        "email",    True,  1),
 ]
 
 
@@ -170,47 +136,6 @@ def main() -> None:
                 (name, slug, priority),
             )
         print(f"collection_cluster_types  : {len(COLLECTION_CLUSTER_TYPES)} upserted")
-
-        for name, slug, is_default, is_creator, is_admin in USER_TYPES:
-            cur.execute(
-                """
-                INSERT INTO user_types (name, slug, is_default, is_creator, is_admin)
-                VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (slug) DO UPDATE
-                SET name = EXCLUDED.name,
-                    is_default = EXCLUDED.is_default,
-                    is_creator = EXCLUDED.is_creator,
-                    is_admin = EXCLUDED.is_admin
-                """,
-                (name, slug, is_default, is_creator, is_admin),
-            )
-        print(f"user_types                : {len(USER_TYPES)} upserted")
-
-        for name, slug, ct_slug, allows_multiple in FACET_TYPES:
-            cur.execute(
-                """
-                INSERT INTO facet_types (name, slug, applies_to_collection_type_id, allows_multiple)
-                VALUES (%s, %s, (SELECT id FROM collection_types WHERE slug = %s), %s)
-                ON CONFLICT (slug) DO UPDATE
-                SET name = EXCLUDED.name,
-                    applies_to_collection_type_id = EXCLUDED.applies_to_collection_type_id,
-                    allows_multiple = EXCLUDED.allows_multiple
-                """,
-                (name, slug, ct_slug, allows_multiple),
-            )
-        print(f"facet_types               : {len(FACET_TYPES)} upserted")
-
-        for ft_slug, name, slug in FACET_VALUES:
-            cur.execute(
-                """
-                INSERT INTO facet_values (facet_type_id, name, slug)
-                SELECT id, %s, %s FROM facet_types WHERE slug = %s
-                ON CONFLICT (facet_type_id, slug) DO UPDATE
-                SET name = EXCLUDED.name
-                """,
-                (name, slug, ft_slug),
-            )
-        print(f"facet_values              : {len(FACET_VALUES)} upserted")
 
         for name, slug in TAGS:
             cur.execute(

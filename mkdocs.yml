@@ -49,8 +49,17 @@ nav:
       - migrations/index.md
       - 1. Geo Migration: migrations/geo-migration.md
       - "Geo Migration — Notebook": migrations/notebooks/geo_migration.ipynb
-      - 2. User Migration: migrations/user-migration.md
+      - 2. Media Migration: migrations/media-migration.md
+      - 3. Company Migration: migrations/company-migration.md
+      - "Media/UserTypes/Companies — Notebook": migrations/notebooks/media_usertypes_companies_migration.ipynb
+      - 4. User Migration: migrations/user-migration.md
       - "User Migration — Notebook": migrations/notebooks/user_migration.ipynb
+      - 5. Directory & Album Migration: migrations/directory-album-migration.md
+      - "Directory/Album — Notebook": migrations/notebooks/directory_album_migration.ipynb
+      - 6. Tags Facet Migration: migrations/tags-facet-migration.md
+      - "Tags Facet — Notebook": migrations/notebooks/tags_facet_migration.ipynb
+      - 7. Postcard Migration: migrations/postcard-migration.md
+      - "Postcard — Notebook": migrations/notebooks/postcard_migration.ipynb
 
 markdown_extensions:
   - admonition

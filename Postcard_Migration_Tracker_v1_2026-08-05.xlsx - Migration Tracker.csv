@@ -1,0 +1,47 @@
+#,v1 Table,v2 Target,Type,Depends On (must be Done first),Status,Note
+1,Country,Country,Direct,-,Verified,"Static list, no change."
+2,Tag,FacetType 'Experience' + FacetAssignment (owned_type=postcard),Transform,-,Not Started,"Confirmed 2026-08-05: renamed to 'Experience' FacetType, owned by Postcard only (FacetAssignment owned_type=postcard). Property-level filtering rolls up from child Postcards, no direct Collection-level assignment - unlike Theme."
+3,User-type,UserType,Transform,-,Not Started,"Confirmed 2026-08-05: table with title, slug, and a relation to User (via UserRole join). isDefault/isCreator/isAdmin flags dropped - confirm intentional."
+4,Company,Company,Transform,-,Not Started,"Confirmed 2026-08-05: title, logo, coverImage, relation to User via UserRole (multi-company support), relation to Collection via managed_by_company_id."
+5,Upload - File,Media,Direct,-,Verified,"Confirmed 2026-08-05: exact match migration, no field changes needed beyond the numeric-ID -> UUID mapping."
+6,Directory,CollectionType,Transform,-,Not Started,Reconcile v1 list to the fixed 5-value set.
+7,Category,FacetType/FacetValue,Transform,-,Not Started,Confirmed replaced by Facets.
+8,Environment,FacetType/FacetValue,Transform,-,Not Started,Confirmed replaced by Facets.
+9,Region,Region,Direct,Country,Verified,"Dedupe on (name, country_id) first."
+10,Users-Permissions-Role,(feeds UserType classification),Transform,User-type,Not Started,"Lookup only, not its own table."
+11,Destination-expert,Collection (Destination Expert),Transform,Directory,Not Started,
+12,Users-Permissions-User,User + UserType + UserRole,Transform,"User-type, Users-Permissions-Role",Not Started,SECURITY GATE: no shared social-login password hash carried over.
+13,Dx-card,Postcard (under Destination Expert),Transform,Destination-expert,Not Started,
+14,Album,Collection AND Subcollection,Transform,"Directory, Country/Region, Company, Media",Not Started,MAJOR SPLIT. Add 2nd price field first (dual-price fix).
+15,Locality / City,Locality + City,Transform,Region + Album/Restaurant addresses,Not Started,"Created via Gmap geocoding alongside Album/Restaurant, not pre-loaded."
+16,Postcard,Postcard,Direct,"Album, Tag",Verified,
+17,City-guide,CollectionCluster (City Guide),Transform,Restaurant/Postcard rows it links,Not Started,'Todo' place type has no v2 home yet - decision needed.
+18,Bookmark,Circle (bookmark),Direct,"Postcard, User",Verified,
+19,Memory,Memory,Direct,"Postcard, User",Verified,
+20,Event,UserEvent,Direct,"User, Event-master",Verified,Don't confuse with CollectionType 'Events'.
+21,Follow,Circle (owned_type=user),Transform,User,Not Started,BLOCKED - relationship enum needs a 'follow' value.
+22,Follow-affiliate,Circle (owned_type=collection_cluster),Transform,Affiliation,Not Started,Same block as Follow.
+23,Follow-album,Circle (owned_type=collection),Transform,Album,Not Started,Same block as Follow.
+24,Follow-city-guide,Circle (owned_type=collection_cluster),Transform,City-guide,Not Started,Same block as Follow.
+25,Follow-company,Circle (owned_type=company),Transform,Company,Not Started,Same block as Follow.
+26,Follow-tag,Circle (owned_type=tag),Transform,Tag,Not Started,Same block as Follow.
+27,(no v1 source),Enquiry,New - no migration,"User, Postcard/Album",Blocked,Schema not written yet - blocks this row.
+28,(no v1 source),TravelDiaryEntry,New - no migration,Enquiry,Blocked,Blocked until Enquiry exists.
+29,Tag-group,FacetType or FacetValue,Transform,-,Not Started,Confirmed 2026-08-05: maps to FacetType or FacetValue (per-group judgment call resolved).
+30,Sign-up,(none - not migrating),Not migrating,-,Not Migrating,"Confirmed 2026-08-05: only held login/access code, can be removed - not migrated."
+31,Property-itinerary,Subcollection,Transform,Album,Not Started,Confirmed 2026-08-05: becomes a Subcollection (no longer a retire/keep question).
+32,Travelogue,Subcollection (under Destination Expert),Transform,Destination-expert,Not Started,Confirmed 2026-08-05: becomes a Subcollection under Destination Expert.
+33,Session,(none),Not migrating,-,Not Migrating,Superseded by new auth/session stack.
+34,Album-section,(none),Not migrating,-,Not Migrating,Old CMS page-builder artifact.
+35,About-us-profile,(none),Not migrating,-,Not Migrating,
+36,About-us-section,(none),Not migrating,-,Not Migrating,
+37,Ui-component,(none),Not migrating,-,Not Migrating,CMS page-builder artifact.
+38,Config,(none),Not migrating,-,Not Migrating,Becomes app config/env.
+39,Chat,(none),Not migrating,-,Not Migrating,"AI chat is being rebuilt, not migrated."
+,,,,,,
+How to use this tracker:,,,,,,
+- Work top to bottom - rows are already sequenced so nothing is blocked by a row below it. Start at #1 and go table by table.,,,,,,
+- 'Depends On' lists what must already be Done before you start that row.,,,,,,
+- Update the Status column as you go: Not Started -> In Progress -> Verified -> Done. Rows pre-marked 'Decision Needed' or 'Blocked' need a product/eng call before they can move.,,,,,,
+"- 20 tables have been moved out of the active list into the 'Deferred - Backup' tab (some undecided, some just postponed) - check that tab if a table you expect isn't here.",,,,,,
+"- Full detail (field-level mapping, phase rationale, risk notes) lives in Postcard_v1_to_v2_Migration_Plan.docx and the Migration Plan by Table tab in Postcard_v1_to_v2_Migration_Mapping.xlsx.",,,,,,

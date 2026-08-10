@@ -15,7 +15,14 @@ ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "notebooks"
 DEST = ROOT / "docs" / "migrations" / "notebooks"
 
-NOTEBOOKS = ["geo_migration.ipynb", "user_migration.ipynb"]
+NOTEBOOKS = [
+    "geo_migration.ipynb",
+    "media_usertypes_companies_migration.ipynb",
+    "user_migration.ipynb",
+    "directory_album_migration.ipynb",
+    "tags_facet_migration.ipynb",
+    "postcard_migration.ipynb",
+]
 
 
 def on_pre_build(config, **kwargs):

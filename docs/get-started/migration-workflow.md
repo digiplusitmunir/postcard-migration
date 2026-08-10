@@ -62,8 +62,9 @@ keep them.
 python scripts/seed.py
 ```
 
-Inserts every developer-defined type table (collection/user/facet/response
-types + values, sample tags) — details in [Seed Scripts](seed-scripts.md).
+Inserts every developer-defined type table (collection/user/response
+types + values, sample tags; facets come from the tags facet migration) —
+details in [Seed Scripts](seed-scripts.md).
 Idempotent — safe to run repeatedly.
 
 ## Step 5 — run migration scripts / notebooks (Python)

@@ -45,7 +45,8 @@ python scripts/seed.py
 
 `seed.py` fills **every table the API/application will never write to** —
 the type/definition tables that developers maintain and that all other data
-FKs onto (collection/user/facet/response types + values, sample tags).
+FKs onto (collection/user/response types + values, sample tags — facet
+types/values come from the tags facet migration, not the seed).
 It is idempotent, so *truncate → seed* can be repeated endlessly.
 
 Full table-by-table breakdown: [Seed Scripts](seed-scripts.md).
@@ -56,7 +57,7 @@ Full table-by-table breakdown: [Seed Scripts](seed-scripts.md).
 npm run studio        # http://localhost:5555
 ```
 
-Check `collection_types`, `user_types`, `facet_types` → `facet_values`, and
+Check `collection_types`, `user_types`, and
 `response_types` → `response_fields`.
 
 ## 6. Continue with the migration notebooks
