@@ -60,6 +60,12 @@ nav:
       - "Tags Facet — Notebook": migrations/notebooks/tags_facet_migration.ipynb
       - 7. Postcard Migration: migrations/postcard-migration.md
       - "Postcard — Notebook": migrations/notebooks/postcard_migration.ipynb
+      - 8. Journey Migration: migrations/journey-migration.md
+      - "Journey — Notebook": migrations/notebooks/journey_migration.ipynb
+      - 9. City Guide Migration: migrations/cityguide-migration.md
+      - "City Guide — Notebook": migrations/notebooks/cityguide_migration.ipynb
+      - 10. Bookmark Migration: migrations/bookmark-migration.md
+      - "Bookmark — Notebook": migrations/notebooks/bookmark_migration.ipynb
 
 markdown_extensions:
   - admonition

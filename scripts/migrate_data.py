@@ -9,6 +9,9 @@ Order:
   6. directory_album.py - directories -> collection_types, albums -> collections
   7. tags_facet.py     - tags -> FacetType 'Experience' + facet_values
   8. postcard.py       - postcards -> postcards + facet_assignments (tags)
+  9. journey.py        - property_itineraries -> subcollections + subcollection_postcards
+  10. cityguide.py     - city_guides -> collection_clusters + derived entries
+  11. bookmark.py      - bookmarks -> circles (postcard bookmark)
 
 Each step runs as its own process; a non-zero exit code (any uncaught
 exception in the step) aborts the whole pipeline immediately.
@@ -32,6 +35,9 @@ STEPS = [
     "directory_album.py",
     "tags_facet.py",
     "postcard.py",
+    "journey.py",
+    "cityguide.py",
+    "bookmark.py",
 ]
 
 

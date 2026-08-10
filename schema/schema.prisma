@@ -269,6 +269,9 @@ model Subcollection {
   priceStartingAt     Decimal?      @map("price_starting_at") @db.Decimal(12, 2)
   /// fixed from legacy string type
   numberOfNights      Int?          @map("number_of_nights")
+  /// legacy property-itinerary numberOfDays
+  numberOfDays        Int?          @map("number_of_days")
+  coverMediaId        BigInt?       @map("cover_media_id")
   /// replaces the numberOfGuestsTitle/Value label-value hack
   guestsMin           Int?          @map("guests_min")
   guestsMax           Int?          @map("guests_max")
@@ -278,6 +281,7 @@ model Subcollection {
   status              ContentStatus @default(draft)
   subcollectionType SubcollectionType @relation(fields: [subcollectionTypeId], references: [id])
   collection        Collection        @relation(fields: [collectionId], references: [id])
+  coverMedia        Media?            @relation("SubcollectionCoverMedia", fields: [coverMediaId], references: [id])
   managedByCompany  Company?          @relation(fields: [managedByCompanyId], references: [id])
   postcards SubcollectionPostcard[]
   enquiries Enquiry[]
@@ -327,8 +331,12 @@ model CollectionCluster {
   localityId         BigInt?       @map("locality_id")
   /// meaningful for Partner Affiliation
   managedByCompanyId BigInt?       @map("managed_by_company_id")
+  coverMediaId       BigInt?       @map("cover_media_id")
+  /// legacy city-guide communityLink (WhatsApp/community URL)
+  communityLink      String?       @map("community_link")
   status             ContentStatus @default(draft)
   clusterType      CollectionClusterType @relation(fields: [clusterTypeId], references: [id])
+  coverMedia       Media?                @relation("CollectionClusterCoverMedia", fields: [coverMediaId], references: [id])
   country          Country?              @relation(fields: [countryId], references: [id])
   region           Region?               @relation(fields: [regionId], references: [id])
   city             City?                 @relation(fields: [cityId], references: [id])
@@ -765,8 +773,10 @@ model Media {
   alt      String?
   width    Int?
   height   Int?
-  collectionCovers Collection[] @relation("CollectionCoverMedia")
-  postcardCovers   Postcard[]   @relation("PostcardCoverMedia")
+  collectionCovers    Collection[]        @relation("CollectionCoverMedia")
+  postcardCovers      Postcard[]          @relation("PostcardCoverMedia")
+  subcollectionCovers Subcollection[]     @relation("SubcollectionCoverMedia")
+  clusterCovers       CollectionCluster[] @relation("CollectionClusterCoverMedia")
   userProfilePics  User[]       @relation("UserProfilePic")
   userCoverImages  User[]       @relation("UserCoverImage")
   memoryGalleries  Memory[]     @relation("MemoryGallery")

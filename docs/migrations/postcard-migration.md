@@ -43,9 +43,9 @@ Legacy `api::postcard.postcard` → new `postcards`.
 | `articleURL` | string | — | **dropped** — empty everywhere (reviewed 2026-08-07) |
 | `isFounderStory` | boolean | — | **dropped — no v2 home**; revisit if it should become a facet or flag |
 | `album_themes` | relation | — | empty on postcards; themes live on albums → facet migrations |
-| `bookmarks` | relation | — | deferred → tracker #18 (Circle bookmark) |
+| `bookmarks` | relation | — | migrated by the [Bookmark migration](bookmark-migration.md) (tracker #18, Circle bookmark) |
 | `memories` | relation | — | deferred → tracker #19 (Memory) |
-| `property_itineraries` | relation | — | deferred → tracker #31 (Subcollection) |
+| `property_itineraries` | relation | — | migrated by the [Journey migration](journey-migration.md) (tracker #31) |
 | `createdAt/updatedAt`, `createdBy/updatedBy` | Strapi housekeeping | — | dropped (except `published_at` above) |
 
 `location` and `event_details` stay NULL — legacy postcards carry no

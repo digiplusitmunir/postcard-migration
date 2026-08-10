@@ -22,6 +22,9 @@ NOTEBOOKS = [
     "directory_album_migration.ipynb",
     "tags_facet_migration.ipynb",
     "postcard_migration.ipynb",
+    "journey_migration.ipynb",
+    "cityguide_migration.ipynb",
+    "bookmark_migration.ipynb",
 ]
 
 

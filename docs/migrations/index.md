@@ -5,8 +5,8 @@ Each data migration is a script in `scripts/` and/or a Jupyter notebook in
 mapping, what gets dropped, and what needs manual work afterwards.
 
 `python scripts/migrate_data.py` runs the scripted steps (seed → geo → media
-→ company → users → directory/album → tags facet → postcard) in sequence and
-stops on the first failure.
+→ company → users → directory/album → tags facet → postcard → journey →
+city guide → bookmark) in sequence and stops on the first failure.
 
 ## Run order — this matters
 
@@ -61,10 +61,34 @@ Migrations depend on each other's data. Always run them in this order:
                         legacy_postcard_id_map for bookmarks/memories.
                         Optional author circles: notebook only
 
-8. ...next         remaining facets (Category/Environment/Tag-group),
-                        circles (bookmarks/follows), memories, Journey
-                        subcollections — to be added, in an order that
-                        respects their FKs
+8. Journey         scripts/journey.py  (or notebooks/journey_migration.ipynb)
+                        property_itineraries → subcollections (Journey under
+                        Properties) + ordered subcollection_postcards join —
+                        consumes the album AND postcard per-env map files
+                        (hard prerequisites); needs schema migration
+                        20260810060000 (cover + days columns); writes
+                        legacy_itinerary_id_map for enquiries/bookings.
+                        Optional author circles: notebook only
+
+9. City Guide      scripts/cityguide.py  (or notebooks/cityguide_migration.ipynb)
+                        city_guides → collection_clusters (City Guide type) +
+                        geo-derived collection_cluster_entries — legacy region
+                        maps to the v2 CITIES tier (cities were synthesized
+                        1:1 from regions); needs schema migration
+                        20260810080000 (cover + community_link columns);
+                        writes legacy_cityguide_id_map for follows (#24)
+
+10. Bookmark       scripts/bookmark.py  (or notebooks/bookmark_migration.ipynb)
+                        bookmarks → circles (owned_type=postcard,
+                        relationship=bookmark) — first use of the Circle
+                        layer; consumes the user AND postcard per-env map
+                        files (hard prerequisites); createdAt carried into
+                        added_at; Designer Tours bookmarks re-attach after
+                        the dx-card migration (#13)
+
+11. ...next        remaining facets (Category/Environment/Tag-group),
+                        circles (follows), memories — to be added, in an
+                        order that respects their FKs
 ```
 
 | # | Migration | Depends on | Mapping doc | Notebook (rendered) |
@@ -76,6 +100,9 @@ Migrations depend on each other's data. Always run them in this order:
 | 5 | Directory/Album | **1**, **2**, **3**, seed | [Directory & Album Migration](directory-album-migration.md) | [directory_album_migration.ipynb](notebooks/directory_album_migration.ipynb) |
 | 6 | Tags facet | seed only | [Tags Facet Migration](tags-facet-migration.md) | [tags_facet_migration.ipynb](notebooks/tags_facet_migration.ipynb) |
 | 7 | Postcard | **5**, **6** (map files) | [Postcard Migration](postcard-migration.md) | [postcard_migration.ipynb](notebooks/postcard_migration.ipynb) |
+| 8 | Journey | **5**, **7** (map files) | [Journey Migration](journey-migration.md) | [journey_migration.ipynb](notebooks/journey_migration.ipynb) |
+| 9 | City Guide | **1**, **2**, **5**, seed | [City Guide Migration](cityguide-migration.md) | [cityguide_migration.ipynb](notebooks/cityguide_migration.ipynb) |
+| 10 | Bookmark | **4**, **7** (map files) | [Bookmark Migration](bookmark-migration.md) | [bookmark_migration.ipynb](notebooks/bookmark_migration.ipynb) |
 
 The **Notebook (rendered)** column shows the live notebook — every markdown and
 code cell — rendered straight from `notebooks/*.ipynb`. It is the same file you
