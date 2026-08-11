@@ -12,8 +12,8 @@ Since many independent tables don't survive into the new schema, the useful sequ
 | 4 | `tag_groups`, then `tags` | `facet_types`, then `tags`/`facet_values` | Tags only depend on tag_groups |
 | 5 | `up_users` | `users` | Needs user_types + companies + countries + media — all done by now |
 | 6 | — (seed) | `collection_types` | New-schema lookup — mostly hand-seeded from `directories`/`categories`, not a straight copy |
-| 7 | `albums` | `collections` | Needs geo, companies, media, users, collection_types |
-| 8 | `postcards` | `postcards` | Needs collections, geo, tags, media |
+| 7 | `albums` | `collections` **or** `postcards` | Needs geo, companies, media, users, collection_types. Only types with `has_dedicated_collection = true` (Properties) get collections; Restaurants/Events/Shopping albums go straight to `postcards` with `collection_id = NULL` |
+| 8 | `postcards` | `postcards` | Needs collections, geo, tags, media — and the album-derived postcards from step 7, whose slugs it must not take |
 | 9 | `property_itineraries` / `travelogues` | `subcollections` + `subcollection_postcards` | Needs collections + postcards |
 | 10 | `memories` | `memories` | Needs users, postcards, geo, media (one of the last) |
 

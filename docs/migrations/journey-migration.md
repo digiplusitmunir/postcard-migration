@@ -15,7 +15,10 @@ A journey consumes both per-environment map files produced by earlier steps
 
 - `legacy_album_id_map_*.json` (directory/album migration) —
   `property_itinerary.album` → `collection_id`, the **required** parent
-  Property of every journey.
+  Property of every journey. Since 2026-08-11 this map holds only albums that
+  became **collections**; Restaurants/Events/Shopping albums are postcards and
+  are therefore absent, so an itinerary hanging off one is skipped (a Journey
+  needs a real Collection parent).
 - `legacy_postcard_id_map_*.json` (postcard migration) — each entry of the
   `postcards` many-to-many → one `subcollection_postcards` row.
 
@@ -35,7 +38,7 @@ Legacy `api::property-itinerary.property-itinerary` → new `subcollections`.
 | `dayWiseItinerary` | richtext (markdown) | `story` | stored as markdown verbatim — render with a markdown component on the frontend |
 | `termsAndConditions` | richtext (markdown) | `tour_info` | same — markdown verbatim |
 | `slug` | UID | `slug` (unique) | from legacy slug else slugify(title); de-duplicated in-run (`foo`, `foo-2`, ...) — id-sorted so suffixes stay stable across re-runs |
-| `album` | oneToOne | `collection_id` (FK, **required**) | via the album id map; itineraries with **no album** or a **Designer Tours album are skipped** → dx-card migration (tracker #11/#13) |
+| `album` | oneToOne | `collection_id` (FK, **required**) | via the album id map; itineraries whose album is **not a collection** are skipped — **no album**, a **Designer Tours** album (→ dx-card migration, tracker #11/#13), or an album of a **non-dedicated type** (Restaurants/Events/Shopping, which are postcards now — 0 in prod, 1 in dev) |
 | `price` | integer | `price` | `priceType` context dropped (below) |
 | `numberOfNights` | integer | `number_of_nights` | |
 | `numberOfDays` | integer | `number_of_days` | column added 2026-08-10 |

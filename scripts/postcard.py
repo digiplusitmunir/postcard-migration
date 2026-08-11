@@ -5,19 +5,27 @@ facet (tracker row #16).
 Migration step 8 of the run order (run AFTER directory_album.py and
 tags_facet.py — it consumes both of their per-environment map files).
 
-Scope decisions (2026-08-07):
+Scope decisions (2026-08-07, album split added 2026-08-11):
 - `album` -> `collection_id` via `legacy_album_id_map_dev/_prod.json`;
-  `collection_type_id` copied from that collection. Postcards whose album
-  was NOT migrated (Designer Tours) are skipped — they belong to the
-  dx-card / Destination Expert migration (tracker #11/#13). Postcards with
+  `collection_type_id` copied from that collection. Postcards with
   no album migrate with collection_id = NULL, defaulted to Properties.
-- `collection_id` is kept for ALL mapped postcards (also Restaurants/
-  Events/Shopping, where the domain convention says geo-direct) — the
-  linkage is preserved rather than thrown away; geo is ALSO set directly.
+- Albums of a **non-dedicated** collection type (Restaurants/Events/
+  Shopping) are themselves postcards now — they are in
+  `legacy_album_postcard_id_map_dev/_prod.json`, not in the collection map.
+  A legacy postcard hanging off such an album gets `collection_id = NULL`
+  and inherits `collection_type_id` + geo from that album-derived postcard
+  (0 such postcards in prod, 6 in dev — kept for completeness).
+  Their slugs are also reserved so this script never upserts over an
+  album-derived postcard row.
+- Postcards whose album is in NEITHER map (Designer Tours) are skipped —
+  they belong to the dx-card / Destination Expert migration (#11/#13).
+- `collection_id` is kept for every postcard whose album became a
+  collection — the linkage is preserved rather than thrown away; geo is
+  ALSO set directly.
 - geo: legacy postcard has only `country`. Resolved country = postcard's
-  country (by name, how geo migrated) else the collection's. region_id /
-  locality_id inherit from the collection only when the collection's
-  country matches the resolved country. city_id stays NULL.
+  country (by name, how geo migrated) else the parent's. region_id /
+  locality_id inherit from the parent only when the parent's country
+  matches the resolved country. city_id stays NULL.
 - `status`: legacy has none — isComplete -> live, else draft.
   published_at = legacy createdAt for live postcards (only timestamp kept).
 - `slug`: majority empty in legacy -> generated from name, de-duplicated
@@ -99,14 +107,19 @@ def fetch_all(path, params=None):
         page += 1
 
 
-def load_map(name):
+def load_map(name, required=True):
     path = ROOT / f"{name}{ENV_SUFFIX}.json"
+    if not required and not path.exists():
+        return {}
     return {int(k): int(v) for k, v in json.loads(path.read_text()).items()}
 
 
-def load_lookups(conn):
-    """Collections give collection_type_id + inherited geo; countries by name
-    (how geo migrated); media by normalized url (same as scripts/media.py)."""
+def load_lookups(conn, album_postcard_ids):
+    """Collections give collection_type_id + inherited geo; album-derived
+    postcards do the same for legacy postcards under a non-dedicated album,
+    and their slugs are reserved so this script never overwrites them.
+    Countries by name (how geo migrated); media by normalized url (same as
+    scripts/media.py)."""
     with conn.cursor() as cur:
         cur.execute("SELECT id, collection_type_id, country_id, region_id, locality_id FROM collections")
         coll_info = {i: (ct, co, rg, lo) for i, ct, co, rg, lo in cur.fetchall()}
@@ -116,15 +129,23 @@ def load_lookups(conn):
         ct_id_by_slug = dict(cur.fetchall())
         cur.execute("SELECT url, id FROM media")
         media_by_url = dict(cur.fetchall())
+        cur.execute(
+            "SELECT id, collection_type_id, country_id, region_id, locality_id, slug "
+            "FROM postcards WHERE id = ANY(%s)", (list(album_postcard_ids),))
+        rows = cur.fetchall()
+    pc_info = {i: (ct, co, rg, lo) for i, ct, co, rg, lo, _ in rows}
+    reserved_slugs = {s for *_, s in rows}
 
     print(f"lookups: {len(coll_info)} collections, {len(country_by_name)} countries, "
-          f"{len(ct_id_by_slug)} collection_types, {len(media_by_url)} media")
-    return coll_info, country_by_name, ct_id_by_slug, media_by_url
+          f"{len(ct_id_by_slug)} collection_types, {len(media_by_url)} media, "
+          f"{len(pc_info)} album-derived postcards (slugs reserved)")
+    return coll_info, pc_info, reserved_slugs, country_by_name, ct_id_by_slug, media_by_url
 
 
-def migrate_postcards(conn, postcards, album_map):
+def migrate_postcards(conn, postcards, album_map, album_postcard_map):
     """Postcard -> postcards. Returns {legacy postcard id: new postcard id}."""
-    coll_info, country_by_name, ct_id_by_slug, media_by_url = load_lookups(conn)
+    (coll_info, pc_info, reserved_slugs, country_by_name,
+     ct_id_by_slug, media_by_url) = load_lookups(conn, set(album_postcard_map.values()))
     default_ct_id = ct_id_by_slug["properties"]  # fallback for postcards with no album
 
     def media_id_for(image, cur):
@@ -144,7 +165,9 @@ def migrate_postcards(conn, postcards, album_map):
         media_by_url[url] = cur.fetchone()[0]
         return media_by_url[url]
 
-    used_slugs = set()
+    # album-derived postcards (Restaurants/Events/Shopping) already own their
+    # slugs — reserve them so an upsert here can never overwrite those rows
+    used_slugs = set(reserved_slugs)
 
     def unique_slug(base):
         base = base or "postcard"
@@ -158,7 +181,7 @@ def migrate_postcards(conn, postcards, album_map):
     postcard_map = {}   # legacy postcard id -> new postcard id
 
     skipped_no_name, skipped_unmigrated_album, no_album = [], [], []
-    missing_country = []
+    album_is_postcard, missing_country = [], []
 
     with conn.cursor() as cur:
         for pc in postcards:
@@ -168,16 +191,22 @@ def migrate_postcards(conn, postcards, album_map):
                 skipped_no_name.append(pc["id"])
                 continue
 
-            # album -> collection (+ its type and geo)
+            # album -> collection (+ its type and geo); an album of a
+            # non-dedicated type is itself a postcard -> no collection to point at
             album = rel(a.get("album"))
             collection_id = ct_id = None
             c_country = c_region = c_locality = None
             if album:
                 collection_id = album_map.get(album["id"])
-                if not collection_id:  # Designer Tours album -> dx-card migration later
+                if collection_id:
+                    ct_id, c_country, c_region, c_locality = coll_info[collection_id]
+                elif album["id"] in album_postcard_map:
+                    parent_pc_id = album_postcard_map[album["id"]]
+                    ct_id, c_country, c_region, c_locality = pc_info[parent_pc_id]
+                    album_is_postcard.append((pc["id"], name, album.get("name")))
+                else:  # Designer Tours album -> dx-card migration later
                     skipped_unmigrated_album.append((pc["id"], name, album.get("name")))
                     continue
-                ct_id, c_country, c_region, c_locality = coll_info[collection_id]
             else:
                 no_album.append((pc["id"], name))
                 ct_id = default_ct_id
@@ -238,6 +267,8 @@ def migrate_postcards(conn, postcards, album_map):
     print(f"skipped (no name): {skipped_no_name}")
     print(f"skipped, album not migrated = Designer Tours ({len(skipped_unmigrated_album)}): {skipped_unmigrated_album[:10]}")
     print(f"no album -> defaulted to Properties, no collection ({len(no_album)}): {no_album[:20]}")
+    print(f"album is itself a postcard (non-dedicated type) -> collection_id NULL, "
+          f"type/geo inherited ({len(album_is_postcard)}): {album_is_postcard[:20]}")
     print(f"MANUAL REVIEW country not found ({len(missing_country)}): {missing_country[:20]}")
     return postcard_map
 
@@ -274,16 +305,24 @@ def assign_facets(conn, postcards, postcard_map, tag_map):
 
 def verify(conn):
     with conn.cursor() as cur:
+        print(f"{'collection type':22} {'total':>7} {'w/ coll':>8} {'no coll':>8}")
         cur.execute("""
-            SELECT ct.name, COUNT(p.id) FROM collection_types ct
+            SELECT ct.name, COUNT(p.id),
+                   COUNT(p.collection_id),
+                   COUNT(p.id) - COUNT(p.collection_id)
+            FROM collection_types ct
             LEFT JOIN postcards p ON p.collection_type_id = ct.id
             GROUP BY ct.id, ct.name ORDER BY MIN(ct.priority)
         """)
-        for name, n in cur.fetchall():
-            print(f"{name:22}: {n}")
+        for name, n, with_coll, without in cur.fetchall():
+            print(f"{name:22} {n:7} {with_coll:8} {without:8}")
         for label, q in [
             ("postcards total",     "SELECT COUNT(*) FROM postcards"),
             ("with collection",     "SELECT COUNT(*) FROM postcards WHERE collection_id IS NOT NULL"),
+            ("album-derived",       "SELECT COUNT(*) FROM postcards WHERE website IS NOT NULL OR event_details IS NOT NULL"),
+            ("bad: nonded w/ coll", """
+                SELECT COUNT(*) FROM postcards p JOIN collection_types ct ON ct.id = p.collection_type_id
+                WHERE ct.has_dedicated_collection = false AND p.collection_id IS NOT NULL"""),
             ("with cover media",    "SELECT COUNT(*) FROM postcards WHERE cover_media_id IS NOT NULL"),
             ("with country",        "SELECT COUNT(*) FROM postcards WHERE country_id IS NOT NULL"),
             ("status = live",       "SELECT COUNT(*) FROM postcards WHERE status = 'live'"),
@@ -300,13 +339,16 @@ def main():
     print("connected to:", DATABASE_URL.rsplit("/", 1)[-1])
 
     album_map = load_map("legacy_album_id_map")
+    album_postcard_map = load_map("legacy_album_postcard_id_map", required=False)
     tag_map = load_map("legacy_tag_id_map")
-    print(f"loaded {len(album_map)} album mappings, {len(tag_map)} tag mappings ({ENV_SUFFIX or 'no suffix'})")
+    print(f"loaded {len(album_map)} album->collection mappings, "
+          f"{len(album_postcard_map)} album->postcard mappings, "
+          f"{len(tag_map)} tag mappings ({ENV_SUFFIX or 'no suffix'})")
 
     postcards = sorted(fetch_all("/api/postcards", {"populate": "*"}), key=lambda x: x["id"])
     print(f"fetched {len(postcards)} postcards")
 
-    postcard_map = migrate_postcards(conn, postcards, album_map)
+    postcard_map = migrate_postcards(conn, postcards, album_map, album_postcard_map)
     assign_facets(conn, postcards, postcard_map, tag_map)
 
     out = ROOT / f"legacy_postcard_id_map{ENV_SUFFIX}.json"

@@ -20,8 +20,14 @@ Scope decisions (2026-08-10):
 - status: 'published' -> live, else draft.
 - Entries: legacy city-guides carry NO explicit content links (the legacy
   frontend listed content by region). When DERIVE_ENTRIES is True (default),
-  every live collection in the guide's region becomes an entry
-  (entry_type='collection', priority 0 — re-order in the CMS later).
+  entries are derived from geo **scoped by the cluster type**: only content
+  whose collection type is listed in `cluster_type_collection_types` for the
+  cluster's type is pulled in. City Guide is seeded as a cluster of
+  Restaurants + Events + Shopping, so Properties collections are NOT derived.
+  Live in-scope collections become entry_type='collection'; live in-scope
+  postcards with no collection become entry_type='postcard' (which is where
+  Restaurants/Events/Shopping content lives since the album split). Both at
+  priority 0 — re-order in the CMS later.
   ON CONFLICT DO NOTHING: hand-curated additions survive re-runs, rows are
   only ever added, never removed. Set DERIVE_ENTRIES = False to curate
   entries by hand instead.
@@ -56,8 +62,9 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 # map files are suffixed per environment, keyed off the DB name in DATABASE_URL
 ENV_SUFFIX = {"development": "_dev", "production": "_prod"}.get(DATABASE_URL.rsplit("/", 1)[-1], "")
 
-# derive collection_cluster_entries from geo (live collections in the guide's
-# region); set to False to keep clusters empty for hand-curation instead
+# derive collection_cluster_entries from geo (live collections + live
+# collection-less postcards in the guide's region); set to False to keep
+# clusters empty for hand-curation instead
 DERIVE_ENTRIES = True
 
 
@@ -248,9 +255,17 @@ def migrate_city_guides(conn, city_guides):
 
 
 def derive_entries(conn, cityguide_map, region_of):
-    """Geo-derived entries: every live collection in the guide's region ->
-    one collection_cluster_entries row (entry_type='collection', priority 0)."""
-    entries = 0
+    """Geo-derived entries for every live item in the guide's region:
+
+    - `entry_type='collection'` for live collections (Properties), and
+    - `entry_type='postcard'` for live collection-less postcards, i.e. the
+      Restaurants/Events/Shopping albums that migrated straight into
+      `postcards` (they used to be collections and were picked up by the
+      collection branch alone).
+
+    Both at priority 0 — re-order in the CMS later.
+    """
+    collection_entries = postcard_entries = 0
     with conn.cursor() as cur:
         for cg_id, cluster_id in cityguide_map.items():
             region_id = region_of.get(cg_id)
@@ -266,10 +281,25 @@ def derive_entries(conn, cityguide_map, region_of):
                 """,
                 (cluster_id, region_id),
             )
-            entries += cur.rowcount
+            collection_entries += cur.rowcount
+            cur.execute(
+                """
+                INSERT INTO collection_cluster_entries (cluster_id, entry_type, entry_id, priority)
+                SELECT %s, 'postcard', p.id, 0
+                FROM postcards p
+                JOIN collection_types ct ON ct.id = p.collection_type_id
+                WHERE p.region_id = %s AND p.status = 'live'
+                  AND p.collection_id IS NULL
+                  AND ct.has_dedicated_collection = false
+                ON CONFLICT (cluster_id, entry_type, entry_id) DO NOTHING
+                """,
+                (cluster_id, region_id),
+            )
+            postcard_entries += cur.rowcount
 
     conn.commit()
-    print(f"collection_cluster_entries inserted this run: {entries}")
+    print(f"collection_cluster_entries inserted this run: {collection_entries} collection, "
+          f"{postcard_entries} postcard")
 
 
 def verify(conn):

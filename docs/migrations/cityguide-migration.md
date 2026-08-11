@@ -14,8 +14,9 @@ No per-env map files are consumed — everything resolves against the DB:
 - **geo migration** — cities are the match target (see below) and supply
   region/country fallbacks;
 - **media migration** — covers find-or-create against `media` by url;
-- **directory/album migration** — only for the derived-entries step
-  (entries point at `collections` rows);
+- **directory/album migration** — only for the derived-entries step (entries
+  point at `collections` rows, and at the album-derived `postcards` rows for
+  the non-dedicated types);
 - **seed** — the `city-guide` cluster type row (the script asserts it exists
   and fails fast otherwise).
 
@@ -59,17 +60,34 @@ Legacy `api::city-guide.city-guide` → new `collection_clusters`.
 Legacy city-guides carry **no explicit restaurant/postcard links** — the
 legacy frontend listed content by region. The migration reproduces that
 behaviour: with `DERIVE_ENTRIES = True` (script default; notebook section 4,
-marked OPTIONAL), every **live collection in the guide's region** becomes a
-`collection_cluster_entries` row (`entry_type='collection'`, `priority 0` —
-re-order in the CMS later).
+marked OPTIONAL), everything **live in the guide's region** becomes a
+`collection_cluster_entries` row at `priority 0` (re-order in the CMS later):
+
+| Source | Entry |
+|---|---|
+| live `collections` in the region | `entry_type='collection'` |
+| live `postcards` in the region with `collection_id IS NULL` **and** a non-dedicated type | `entry_type='postcard'` |
+
+The postcard branch was added 2026-08-11 with the
+[album split](directory-album-migration.md#the-album-split-collections-vs-postcards):
+Restaurants/Events/Shopping used to be collections and were picked up by the
+first branch alone, so without it every guide would lose its
+restaurant/shopping/event entries.
 
 - `ON CONFLICT DO NOTHING` — hand-curated additions survive re-runs, and
   rows are only ever **added, never removed**;
 - set `DERIVE_ENTRIES = False` (or skip the notebook cell) to keep clusters
   empty for hand-curation;
-- postcard-level entries (`entry_type='postcard'`) are **not** derived —
-  they would largely duplicate the collections; add them per-guide in the
-  CMS if wanted.
+- postcards that hang off a Properties collection are still **not** derived —
+  they would duplicate their parent collection; add them per-guide in the CMS
+  if wanted.
+
+!!! warning "Re-migrating over a pre-split database"
+    A DB migrated before the split holds `entry_type='collection'` rows
+    pointing at the old Restaurants/Shopping/Events collections (588 in prod).
+    `scripts/directory_album.py` aborts on them rather than cascading — delete
+    them with the SQL it prints, then re-run this step to get the equivalent
+    `entry_type='postcard'` rows.
 
 The tracker's *"'Todo' place type has no v2 home yet"* note remains an open
 product decision — nothing here resolves it.
@@ -113,7 +131,7 @@ for the environment being migrated.
 ```
 
 Needs geo/media/directory-album data in the DB (and seed for the cluster
-type) but no map files — it could run any time after step 5; it is sequenced
-last so derived entries see the full set of live collections. Or just run
+type) but no map files — it is sequenced last so derived entries see the full
+set of live collections **and** the album-derived postcards. Or just run
 `python scripts/migrate_data.py`, which sequences everything and stops on
 the first failure.

@@ -146,6 +146,8 @@ model CollectionType {
   postcards          Postcard[]
   subcollectionTypes SubcollectionType[]
   facetTypes         FacetType[]
+  /// which cluster types group this collection type (Restaurants -> City Guide)
+  clusterTypes       ClusterTypeCollectionType[]
   @@map("collection_types")
 }
 
@@ -200,7 +202,8 @@ model Postcard {
   story            String?
   /// always populated
   collectionTypeId BigInt        @map("collection_type_id")
-  /// populated only when CollectionType.has_dedicated_collection = true
+  /// populated only when CollectionType.has_dedicated_collection = true;
+  /// NULL for Restaurants/Events/Shopping, which have no Collection layer
   collectionId     BigInt?       @map("collection_id")
   /// geo set directly when collection_id is null (Restaurants/Events/Shopping)
   countryId        BigInt?       @map("country_id")
@@ -211,6 +214,9 @@ model Postcard {
   location         Json?
   /// Events only: start_date, end_date, is_recurring, recurrence_rule, venue
   eventDetails     Json?         @map("event_details")
+  /// official site / booking link — set for postcards migrated from a
+  /// Restaurants/Events/Shopping album (mirrors Collection.website)
+  website          String?
   copyright        String?
   isFeatured       Boolean       @default(false) @map("is_featured")
   priority         Int           @default(0)
@@ -313,7 +319,27 @@ model CollectionClusterType {
   description String?
   priority    Int     @default(0)
   clusters CollectionCluster[]
+  /// which CollectionTypes this kind of cluster is a cluster OF
+  /// (City Guide -> Restaurants, Events, Shopping)
+  collectionTypes ClusterTypeCollectionType[]
   @@map("collection_cluster_types")
+}
+
+/// Scope of a cluster type: the CollectionTypes it groups. A City Guide is a
+/// cluster of Restaurants + Events + Shopping, so those are its three rows.
+/// Declares what a cluster of this kind may hold, and drives which content the
+/// geo-derived `collection_cluster_entries` step pulls in.
+model ClusterTypeCollectionType {
+  id               BigInt @id @default(autoincrement())
+  clusterTypeId    BigInt @map("cluster_type_id")
+  collectionTypeId BigInt @map("collection_type_id")
+  /// display order of this collection type within the cluster
+  priority         Int    @default(0)
+  clusterType    CollectionClusterType @relation(fields: [clusterTypeId], references: [id], onDelete: Cascade)
+  collectionType CollectionType        @relation(fields: [collectionTypeId], references: [id])
+  @@unique([clusterTypeId, collectionTypeId])
+  @@index([collectionTypeId])
+  @@map("cluster_type_collection_types")
 }
 
 model CollectionCluster {

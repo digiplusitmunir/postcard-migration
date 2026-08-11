@@ -7,7 +7,9 @@ the platform grows.
 
   collection_types          Properties, Restaurants, Events, ...
   subcollection_types       Journey (under Properties)
-  collection_cluster_types  City Guide, Partner Affiliation
+  collection_cluster_types  City Guide
+  cluster_type_collection_types
+                            City Guide -> Restaurants, Events, Shopping
   tags                      sample postcard-level feature tags
   response_types            contact_form, feedback, newsletter_signup
   response_fields           field definitions per response type
@@ -49,6 +51,17 @@ SUBCOLLECTION_TYPES = [
 # name, slug, priority
 COLLECTION_CLUSTER_TYPES = [
     ("City Guide",          "city-guide",          1),
+]
+
+# Which collection types each cluster type is a cluster OF — a City Guide
+# groups the geo-direct content of a city: Restaurants, Events and Shopping.
+# This drives the geo-derived entries in scripts/cityguide.py, so a collection
+# type left out here is never pulled into a cluster of that kind.
+# cluster_type_slug, collection_type_slug, priority (order within the cluster)
+CLUSTER_TYPE_COLLECTION_TYPES = [
+    ("city-guide", "restaurants", 1),
+    ("city-guide", "events",      2),
+    ("city-guide", "shopping",    3),
 ]
 
 # NOTE: user_types are NOT seeded here — they are migrated from the legacy CMS
@@ -136,6 +149,24 @@ def main() -> None:
                 (name, slug, priority),
             )
         print(f"collection_cluster_types  : {len(COLLECTION_CLUSTER_TYPES)} upserted")
+
+        for cluster_slug, ct_slug, priority in CLUSTER_TYPE_COLLECTION_TYPES:
+            cur.execute(
+                """
+                INSERT INTO cluster_type_collection_types
+                    (cluster_type_id, collection_type_id, priority)
+                SELECT cct.id, ct.id, %s
+                FROM collection_cluster_types cct, collection_types ct
+                WHERE cct.slug = %s AND ct.slug = %s
+                ON CONFLICT (cluster_type_id, collection_type_id) DO UPDATE
+                SET priority = EXCLUDED.priority
+                """,
+                (priority, cluster_slug, ct_slug),
+            )
+            if cur.rowcount != 1:
+                sys.exit(f"seed failed: cluster type '{cluster_slug}' or collection type "
+                         f"'{ct_slug}' does not exist")
+        print(f"cluster_type_collection_types: {len(CLUSTER_TYPE_COLLECTION_TYPES)} upserted")
 
         for name, slug in TAGS:
             cur.execute(

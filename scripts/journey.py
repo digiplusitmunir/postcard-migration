@@ -7,8 +7,11 @@ postcard.py — it consumes both of their per-environment map files).
 
 Scope decisions (2026-08-10):
 - `album` -> `collection_id` (required in v2) via `legacy_album_id_map`.
-  Itineraries with no album or an unmigrated album (Designer Tours) are
-  skipped -> manual review lists.
+  Itineraries with no album, or whose album is not a collection, are skipped
+  -> manual review lists. An album is not a collection when it is Designer
+  Tours (dx-card migration later) or belongs to a non-dedicated collection
+  type (Restaurants/Events/Shopping — those albums became postcards; 1 such
+  itinerary in dev, 0 in prod as of 2026-08-11).
 - Field map: title -> name, description -> intro, dayWiseItinerary -> story,
   termsAndConditions -> tour_info, price -> price,
   numberOfNights -> number_of_nights, numberOfDays -> number_of_days,
@@ -180,7 +183,10 @@ def migrate_journeys(conn, itineraries, album_map):
                 skipped_no_album.append((it["id"], title))
                 continue
             collection_id = album_map.get(album["id"])
-            if not collection_id:  # Designer Tours album -> dx-card migration later
+            if not collection_id:
+                # Designer Tours (-> dx-card migration later), or an album of a
+                # non-dedicated type (Restaurants/Events/Shopping) which is now
+                # a postcard, not a collection — either way there is no parent
                 skipped_unmigrated_album.append((it["id"], title, album.get("name")))
                 continue
 
@@ -242,7 +248,8 @@ def migrate_journeys(conn, itineraries, album_map):
     print(f"legacy status counts (deckFreeze/onTrip/complete -> live): {status_counts}")
     print(f"skipped (no title): {skipped_no_title}")
     print(f"skipped (no album - journey needs a parent Property) ({len(skipped_no_album)}): {skipped_no_album}")
-    print(f"skipped, album not migrated = Designer Tours ({len(skipped_unmigrated_album)}): {skipped_unmigrated_album}")
+    print(f"skipped, album is not a collection = Designer Tours or a non-dedicated "
+          f"type ({len(skipped_unmigrated_album)}): {skipped_unmigrated_album}")
     print(f"MANUAL REVIEW priceType != 'per person' (dropped field) ({len(twin_sharing)}): {twin_sharing}")
     return itinerary_map, collection_of
 

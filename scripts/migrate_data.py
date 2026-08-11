@@ -6,7 +6,8 @@ Order:
   3. media.py          - legacy upload files -> media
   4. company.py        - legacy companies -> companies (incl. icon -> media)
   5. users.py          - user_types, users (media attach), user_roles (company attach)
-  6. directory_album.py - directories -> collection_types, albums -> collections
+  6. directory_album.py - directories -> collection_types; albums -> collections
+                          (dedicated types) or postcards (Restaurants/Events/Shopping)
   7. tags_facet.py     - tags -> FacetType 'Experience' + facet_values
   8. postcard.py       - postcards -> postcards + facet_assignments (tags)
   9. journey.py        - property_itineraries -> subcollections + subcollection_postcards
