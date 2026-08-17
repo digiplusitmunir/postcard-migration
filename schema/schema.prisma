@@ -1,17 +1,34 @@
 // =============================================================================
-// Postcard Travel Club — Prisma Schema
-// Generated from: Domain Model Diagrams (9 July 2026)
+// Postcard Travel Club — Prisma Schema (v2)
 //
-// Notes on translation decisions:
-// - Provider: PostgreSQL (pgvector extension needed for UserPersona.preference_embedding)
-// - Polymorphic relations (FacetAssignment, CollectionClusterEntry, Circle,
-//   UserEvent.subject) are modeled as enum + BigInt id WITHOUT a Prisma relation,
-//   since Prisma does not support polymorphic FKs. Integrity for these must be
-//   enforced at the application/service layer.
-// - "Embedded components" from the doc (location, seo, event_details, social,
+// Baseline: "Postcard Travel Club — Domain Model — Diagrams & Explanations"
+// (9 July 2026), reconciled against `Postcard_Migration_Tracker(Field Mapping).csv`
+// and verified field-by-field against the live legacy Strapi API.
+//
+// Applied tracker revisions:
+//   R1 2026-08-05  City tier REMOVED — geo is Country -> Region -> Locality.
+//                  Locality dedups on google_place_id (Gmap enrichment).
+//   R2 2026-08-12  Membership split out of User (tier history/expiry).
+//   R3 2026-08-12  Ownership/assignment are DIRECT FKs, never Circle.
+//                  Circle is reserved for follow/bookmark engagement only.
+//   R4 2026-08-12  Bookmark + all six Follow-* tables collapse into ONE
+//                  Circle.relationship = 'bookmark', differentiated only by
+//                  owned_type. Requires the (user_id, owned_type) index.
+//   R5 2026-08-12  Stay Details: ONE price + a price_type enum. The earlier
+//                  dual-price assumption is retracted (price_starting_at gone).
+//   R6 2026-08-12  CollectionCluster membership is DERIVED, not curated:
+//                  CollectionClusterType declares (a) which collection types
+//                  are eligible and (b) which field matches content to a
+//                  cluster instance. No join/entry table.
+//
+// Translation decisions:
+// - Provider: PostgreSQL.
+// - Polymorphic relations (FacetAssignment, Circle, UserEvent.subject,
+//   Enquiry.subject) are modeled as enum + BigInt id WITHOUT a Prisma relation,
+//   since Prisma does not support polymorphic FKs. Integrity is enforced at the
+//   application/service layer.
+// - "Embedded components" from the doc (location, seo, gallery, social,
 //   tracking, best_months) are modeled as Json fields.
-// - Media and Enquiry are referenced by the doc but not defined in it — minimal
-//   stub models are included so relations resolve; extend as needed.
 // - Model/field names are camelCase per Prisma convention, mapped to snake_case
 //   tables/columns via @map/@@map.
 // =============================================================================
@@ -29,7 +46,9 @@ datasource db {
 // ENUMS
 // =============================================================================
 
-/// Editorial workflow for content entities ("the real production editorial workflow")
+/// Editorial workflow for content entities. Legacy Album.status already uses
+/// these exact values (live / assigned / rework / draft), so the migration is
+/// a direct map.
 enum ContentStatus {
   draft
   assigned
@@ -38,54 +57,79 @@ enum ContentStatus {
   live
 }
 
+/// Journey (Subcollection) workflow — deliberately NOT harmonized with
+/// ContentStatus. Values are the legacy property-itinerary status set.
+enum JourneyStatus {
+  draft
+  deckBuild
+  deckFreeze
+  onTrip
+  complete
+}
+
 enum CompanyStatus {
   pending
   active
   suspended
 }
 
-/// Member-specific subscription tier
-enum UserTier {
+/// Continents, from the legacy Country.continent two-letter code
+/// (AF/AN/AS/EU/NA/OC/SA).
+enum Continent {
+  africa
+  antarctica
+  asia
+  europe
+  north_america
+  oceania
+  south_america
+}
+
+/// Membership tier (R2) — moved off User so tier history/expiry is possible.
+enum MembershipTier {
   free
   star_life
 }
 
-/// Doc specifies status as enum without listing values — adjust as needed
+enum MembershipStatus {
+  active
+  expired
+  cancelled
+}
+
 enum UserRoleStatus {
   active
   suspended
   revoked
 }
 
-/// What kind of entity a FacetAssignment applies to
+/// What kind of entity a FacetAssignment applies to.
 enum FacetOwnedType {
   collection
   postcard
+  subcollection
 }
 
-/// What kind of entry a CollectionClusterEntry points at
-enum ClusterEntryType {
-  collection
-  postcard
-}
-
-/// Every ownable/followable entity type in the system (Circle.owned_type)
+/// Every followable entity type in the system (Circle.owned_type).
+/// `tag` is the curated persona vocabulary (`tags`); `facet_value` is a
+/// classification value (`facet_values`) — legacy content tags became
+/// Experience facet values, so legacy follow-tag rows land on `facet_value`.
 enum CircleOwnedType {
   postcard
   collection
   subcollection
   collection_cluster
+  facet_value
   tag
   company
   user
 }
 
-/// author/assigned_staff = content stewardship; owner = business ownership;
-/// bookmark/booked = member engagement
+/// R3/R4: engagement only. Ownership and staff assignment are direct FKs
+/// (Collection.owner_user_id / assigned_to_user_id, Postcard.user_id,
+/// Subcollection.created_by_user_id), NOT Circle rows.
+/// R4: Bookmark and all six legacy Follow-* tables collapse into `bookmark`.
 enum CircleRelationship {
-  author
-  assigned_staff
-  owner
   bookmark
   booked
 }
@@ -96,17 +140,31 @@ enum ShareType {
   selected
 }
 
+/// Behavioural event types. Values cover the legacy event_master codes
+/// (BACKLINK, ALBUM, COLLECT_POSTCARD, FLIP_POSTCARD, FOLLOW_ALBUM,
+/// FOLLOW_USER, SEARCH, AUTOCOMPLETE_*/GUIDED_* search funnel,
+/// POSTCARD_SEARCH_EXPERIENCES) plus the v2-native events.
 enum UserEventType {
-  postcard_view
+  backlink
   collection_view
+  postcard_view
+  postcard_collect
+  postcard_flip
   search
+  search_experiences
+  autocomplete_search_initiated
+  autocomplete_search_completed
+  guided_search_initiated
+  guided_search_completed
+  follow_collection
+  follow_user
   bookmark
   enquiry_submitted
   memory_created
   tag_click
 }
 
-/// UserEvent.subject_type — polymorphic subject of a behavioral event
+/// UserEvent.subject_type — polymorphic subject of a behavioral event.
 enum EventSubjectType {
   postcard
   collection
@@ -117,24 +175,42 @@ enum EventSubjectType {
   user
 }
 
+/// Enquiry.subject_type — polymorphic from day one: today only Journeys take
+/// enquiries, but Properties and Events are expected to need them too.
+enum EnquirySubjectType {
+  subcollection
+  collection
+  postcard
+}
+
+enum EnquiryStatus {
+  new
+  in_progress
+  responded
+  closed
+}
+
 enum PriceAffinity {
   budget
   mid
   luxury
 }
 
-model Example {
-  id    String @id @default(cuid())
-  name  String
-  slug  String @unique
+/// R5: the legacy priceType. The "second" displayed price is CALCULATED off
+/// `price` at read time — there is no second stored price column.
+enum PriceType {
+  per_person
+  twin_sharing
 }
+
 // =============================================================================
 // CONTENT HIERARCHY
 // =============================================================================
 
 model CollectionType {
   id                     BigInt  @id @default(autoincrement())
-  name                   String // Properties, Restaurants, Events, Shopping, Destination Expert
+  /// Properties, Restaurants, Events, Shopping, Destination Expert
+  name                   String
   slug                   String  @unique
   description            String?
   icon                   String?
@@ -142,12 +218,15 @@ model CollectionType {
   hasDedicatedCollection Boolean @default(false) @map("has_dedicated_collection")
   /// display order
   priority               Int     @default(0)
-  collections        Collection[]
-  postcards          Postcard[]
-  subcollectionTypes SubcollectionType[]
-  facetTypes         FacetType[]
-  /// which cluster types group this collection type (Restaurants -> City Guide)
-  clusterTypes       ClusterTypeCollectionType[]
+
+  collections           Collection[]
+  postcards             Postcard[]
+  subcollectionTypes    SubcollectionType[]
+  facetTypes            FacetType[]
+
+  // Which cluster types group this type is declared on:
+  // CollectionClusterType.collection_type_ids — a plain id array, so there is
+  // no Prisma relation to traverse back from here.
   @@map("collection_types")
 }
 
@@ -160,36 +239,50 @@ model Collection {
   story              String?
   slug               String        @unique
   coverMediaId       BigInt?       @map("cover_media_id")
-  /// embedded component: meta title, description, OG image
+  /// embedded component: meta title, description, keywords, canonical URL, OG image
   seo                Json?
+  /// embedded, repeatable: categorized image groups (rooms / exterior / amenities)
+  gallery            Json?
   isFeatured         Boolean       @default(false) @map("is_featured")
   priority           Int           @default(0)
   countryId          BigInt?       @map("country_id")
   regionId           BigInt?       @map("region_id")
-  cityId             BigInt?       @map("city_id")
   localityId         BigInt?       @map("locality_id")
-  /// embedded: address, lat, lng, google_place_id
+  /// embedded Location component: address, street_number, route, subpremise,
+  /// postal_code, admin_area_level_2, city_name (free text, NOT a tier),
+  /// lat, lng, google_place_id (building/address level)
   location           Json?
   /// the corporate/billing entity, if any
   managedByCompanyId BigInt?       @map("managed_by_company_id")
+  /// R3: who the property belongs to (legacy Album.user)
+  ownerUserId        BigInt?       @map("owner_user_id")
+  /// R3: who works on / edits the content (legacy Album.assignTo)
+  assignedToUserId   BigInt?       @map("assigned_to_user_id")
   website            String?
-  mediaKit           String?       @map("media_kit")
-  additionalInfo     String?       @map("additional_info")
-  sustainability     String?
+  signature          String?
+  /// legacy Album.sustainability — renamed; the field is the property's
+  /// "about" copy, and is no longer used as a sustainability-only block
+  about              String?
   status             ContentStatus @default(draft)
+
   collectionType   CollectionType @relation(fields: [collectionTypeId], references: [id])
   coverMedia       Media?         @relation("CollectionCoverMedia", fields: [coverMediaId], references: [id])
   country          Country?       @relation(fields: [countryId], references: [id])
   region           Region?        @relation(fields: [regionId], references: [id])
-  city             City?          @relation(fields: [cityId], references: [id])
   locality         Locality?      @relation(fields: [localityId], references: [id])
   managedByCompany Company?       @relation(fields: [managedByCompanyId], references: [id])
+  owner            User?          @relation("CollectionOwner", fields: [ownerUserId], references: [id])
+  assignedTo       User?          @relation("CollectionAssignee", fields: [assignedToUserId], references: [id])
+
   postcards      Postcard[]
   subcollections Subcollection[]
-  // Sub-type classification (Boutique Stays, Signature Experiences, Cuisine)
-  // lives in FacetAssignment (owned_type = collection) — polymorphic, no direct relation.
+  memories       Memory[]
+
+  // Sub-type classification (Type / Cuisine / Setting / Category) lives in
+  // FacetAssignment (owned_type = collection) — polymorphic, no direct relation.
   @@index([collectionTypeId])
-  @@index([countryId, regionId, cityId, localityId])
+  @@index([countryId, regionId, localityId])
+  @@index([ownerUserId])
   @@map("collections")
 }
 
@@ -205,38 +298,50 @@ model Postcard {
   /// populated only when CollectionType.has_dedicated_collection = true;
   /// NULL for Restaurants/Events/Shopping, which have no Collection layer
   collectionId     BigInt?       @map("collection_id")
+  /// R3: the author (legacy Postcard.user)
+  userId           BigInt?       @map("user_id")
   /// geo set directly when collection_id is null (Restaurants/Events/Shopping)
   countryId        BigInt?       @map("country_id")
   regionId         BigInt?       @map("region_id")
-  cityId           BigInt?       @map("city_id")
   localityId       BigInt?       @map("locality_id")
-  /// embedded: set directly for Restaurants/Shopping postcards
+  /// embedded Location component — same shape as Collection.location
   location         Json?
+  /// embedded SEO component (album-derived postcards carry the album's seo)
+  seo              Json?
   /// Events only: start_date, end_date, is_recurring, recurrence_rule, venue
   eventDetails     Json?         @map("event_details")
   /// official site / booking link — set for postcards migrated from a
   /// Restaurants/Events/Shopping album (mirrors Collection.website)
   website          String?
+  /// legacy Album.signature — set on 672/673 Restaurants/Events/Shopping
+  /// albums, which become postcards rather than collections
+  signature        String?
   copyright        String?
+  isFounderStory   Boolean       @default(false) @map("is_founder_story")
   isFeatured       Boolean       @default(false) @map("is_featured")
   priority         Int           @default(0)
   coverMediaId     BigInt?       @map("cover_media_id")
   status           ContentStatus @default(draft)
   publishedAt      DateTime?     @map("published_at")
+
   collectionType CollectionType @relation(fields: [collectionTypeId], references: [id])
   collection     Collection?    @relation(fields: [collectionId], references: [id])
+  user           User?          @relation("PostcardAuthor", fields: [userId], references: [id])
   coverMedia     Media?         @relation("PostcardCoverMedia", fields: [coverMediaId], references: [id])
   country        Country?       @relation(fields: [countryId], references: [id])
   region         Region?        @relation(fields: [regionId], references: [id])
-  city           City?          @relation(fields: [cityId], references: [id])
   locality       Locality?      @relation(fields: [localityId], references: [id])
-  /// M2M -> Tag (granular postcard-level features)
-  tags                 Tag[]                   @relation("PostcardTags")
+
   subcollectionEntries SubcollectionPostcard[]
   memories             Memory[]
+
+  // Granular feature classification lives in FacetAssignment
+  // (owned_type = postcard, FacetType 'Experience') — the legacy Tag M2M was
+  // removed as a duplicate classification path.
   @@index([collectionId])
   @@index([collectionTypeId])
-  @@index([countryId, regionId, cityId, localityId])
+  @@index([userId])
+  @@index([countryId, regionId, localityId])
   @@map("postcards")
 }
 
@@ -252,8 +357,11 @@ model SubcollectionType {
   slug             String  @unique
   description      String?
   priority         Int     @default(0)
+
   collectionType CollectionType  @relation(fields: [collectionTypeId], references: [id])
   subcollections Subcollection[]
+  facetTypes     FacetType[]
+
   @@map("subcollection_types")
 }
 
@@ -264,34 +372,43 @@ model Subcollection {
   collectionId        BigInt        @map("collection_id")
   name                String
   intro               String?
-  /// richtext
+  /// richtext — reserved for editorial narrative (NOT the day-wise itinerary)
   story               String?
   slug                String        @unique
-  /// richtext
+  /// richtext — reserved for tour logistics (NOT terms & conditions)
   tourInfo            String?       @map("tour_info")
-  /// legacy avgPricePerPerson (dual-price fix: the two legacy prices stay separate)
+  /// richtext, legacy dayWiseItinerary
+  dayWiseItinerary    String?       @map("day_wise_itinerary")
+  /// richtext, legacy termsAndConditions
+  termsAndConditions  String?       @map("terms_and_conditions")
+
+  // ---- Stay Details component (R5) ----
+  /// the single stored price; the "from" price is calculated at read time
   price               Decimal?      @db.Decimal(12, 2)
-  /// legacy pricesStartingAt ("prices starting at" teaser price)
-  priceStartingAt     Decimal?      @map("price_starting_at") @db.Decimal(12, 2)
-  /// fixed from legacy string type
+  priceType           PriceType?    @map("price_type")
   numberOfNights      Int?          @map("number_of_nights")
-  /// legacy property-itinerary numberOfDays
   numberOfDays        Int?          @map("number_of_days")
-  coverMediaId        BigInt?       @map("cover_media_id")
-  /// replaces the numberOfGuestsTitle/Value label-value hack
-  guestsMin           Int?          @map("guests_min")
-  guestsMax           Int?          @map("guests_max")
-  /// embedded, repeatable
+  numberOfRooms       Int?          @map("number_of_rooms")
+  guestsPerRoom       Int?          @map("guests_per_room")
+  /// embedded, repeatable — month names
   bestMonths          Json?         @map("best_months")
+
+  coverMediaId        BigInt?       @map("cover_media_id")
   managedByCompanyId  BigInt?       @map("managed_by_company_id")
-  status              ContentStatus @default(draft)
+  /// R3: the author (legacy property-itinerary createdByUser)
+  createdByUserId     BigInt?       @map("created_by_user_id")
+  status              JourneyStatus @default(draft)
+
   subcollectionType SubcollectionType @relation(fields: [subcollectionTypeId], references: [id])
   collection        Collection        @relation(fields: [collectionId], references: [id])
   coverMedia        Media?            @relation("SubcollectionCoverMedia", fields: [coverMediaId], references: [id])
   managedByCompany  Company?          @relation(fields: [managedByCompanyId], references: [id])
+  createdBy         User?             @relation("SubcollectionCreator", fields: [createdByUserId], references: [id])
+
   postcards SubcollectionPostcard[]
-  enquiries Enquiry[]
+
   @@index([collectionId])
+  @@index([createdByUserId])
   @@map("subcollections")
 }
 
@@ -304,42 +421,41 @@ model SubcollectionPostcard {
   /// Real calendar dates are assigned per member when a Journey is booked
   /// (Circle.sequence_date).
   sequenceOrder   Int    @map("sequence_order")
+
   subcollection Subcollection @relation(fields: [subcollectionId], references: [id], onDelete: Cascade)
   postcard      Postcard      @relation(fields: [postcardId], references: [id], onDelete: Cascade)
+
   @@id([subcollectionId, postcardId])
   @@index([subcollectionId, sequenceOrder])
   @@map("subcollection_postcards")
 }
 
+/// R6: declares BOTH halves of a cluster's derivation rule —
+///   (1) `collection_type_ids`: which CollectionTypes are eligible, in display
+///       order (City Guide -> Restaurants, Events, Shopping);
+///   (2) `match_field`: which field on the content matches it to a cluster
+///       instance (City Guide -> 'region_id'; Partner Affiliation ->
+///       'managed_by_company_id').
+/// Rendering a cluster page is therefore a query, not a stored join:
+///   SELECT ... WHERE collection_type_id = ANY(:collection_type_ids)
+///              AND <match_field> = <the cluster's own value for that field>
+/// Different cluster types key off different fields, so a Collection's City
+/// Guide membership and its Affiliation membership are fully independent.
 model CollectionClusterType {
-  id          BigInt  @id @default(autoincrement())
+  id                BigInt   @id @default(autoincrement())
   /// City Guide, Partner Affiliation
-  name        String
-  slug        String  @unique
-  description String?
-  priority    Int     @default(0)
-  clusters CollectionCluster[]
-  /// which CollectionTypes this kind of cluster is a cluster OF
-  /// (City Guide -> Restaurants, Events, Shopping)
-  collectionTypes ClusterTypeCollectionType[]
-  @@map("collection_cluster_types")
-}
+  name              String
+  slug              String   @unique
+  description       String?
+  priority          Int      @default(0)
+  /// plain CollectionType id array (no FK), display order preserved
+  collectionTypeIds BigInt[] @default([]) @map("collection_type_ids")
+  /// column name on collections/postcards used to match content to a cluster
+  matchField        String   @default("region_id") @map("match_field")
 
-/// Scope of a cluster type: the CollectionTypes it groups. A City Guide is a
-/// cluster of Restaurants + Events + Shopping, so those are its three rows.
-/// Declares what a cluster of this kind may hold, and drives which content the
-/// geo-derived `collection_cluster_entries` step pulls in.
-model ClusterTypeCollectionType {
-  id               BigInt @id @default(autoincrement())
-  clusterTypeId    BigInt @map("cluster_type_id")
-  collectionTypeId BigInt @map("collection_type_id")
-  /// display order of this collection type within the cluster
-  priority         Int    @default(0)
-  clusterType    CollectionClusterType @relation(fields: [clusterTypeId], references: [id], onDelete: Cascade)
-  collectionType CollectionType        @relation(fields: [collectionTypeId], references: [id])
-  @@unique([clusterTypeId, collectionTypeId])
-  @@index([collectionTypeId])
-  @@map("cluster_type_collection_types")
+  clusters CollectionCluster[]
+
+  @@map("collection_cluster_types")
 }
 
 model CollectionCluster {
@@ -350,111 +466,100 @@ model CollectionCluster {
   intro              String?
   /// richtext
   story              String?
-  /// geo meaningful for City Guide
+  /// geo — City Guide is anchored to Region (R1); country kept denormalized
+  /// because the legacy schema carries it as its own relation too
   countryId          BigInt?       @map("country_id")
   regionId           BigInt?       @map("region_id")
-  cityId             BigInt?       @map("city_id")
-  localityId         BigInt?       @map("locality_id")
   /// meaningful for Partner Affiliation
   managedByCompanyId BigInt?       @map("managed_by_company_id")
   coverMediaId       BigInt?       @map("cover_media_id")
   /// legacy city-guide communityLink (WhatsApp/community URL)
   communityLink      String?       @map("community_link")
   status             ContentStatus @default(draft)
+
   clusterType      CollectionClusterType @relation(fields: [clusterTypeId], references: [id])
   coverMedia       Media?                @relation("CollectionClusterCoverMedia", fields: [coverMediaId], references: [id])
   country          Country?              @relation(fields: [countryId], references: [id])
   region           Region?               @relation(fields: [regionId], references: [id])
-  city             City?                 @relation(fields: [cityId], references: [id])
-  locality         Locality?             @relation(fields: [localityId], references: [id])
   managedByCompany Company?              @relation(fields: [managedByCompanyId], references: [id])
-  entries CollectionClusterEntry[]
+
+  @@index([clusterTypeId])
+  @@index([regionId])
   @@map("collection_clusters")
 }
 
-/// Polymorphic join: entry_id points at Collection.id OR Postcard.id depending
-/// on entry_type. No DB-level FK — enforce in the service layer.
-model CollectionClusterEntry {
-  id        BigInt           @id @default(autoincrement())
-  clusterId BigInt           @map("cluster_id")
-  entryType ClusterEntryType @map("entry_type")
-  entryId   BigInt           @map("entry_id")
-  /// curator-controlled display order
-  priority  Int              @default(0)
-  cluster CollectionCluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
-  @@unique([clusterId, entryType, entryId])
-  @@index([entryType, entryId])
-  @@map("collection_cluster_entries")
-}
-
 // =============================================================================
-// GEO HIERARCHY (Country -> Region -> City -> Locality)
+// GEO HIERARCHY (Country -> Region -> Locality)   [R1: City tier removed]
 // Each tier uniquely scoped to its parent, not globally unique.
 // =============================================================================
 
 model Country {
-  id   BigInt @id @default(autoincrement())
-  name String @unique
-  slug String @unique
+  id          BigInt     @id @default(autoincrement())
+  name        String     @unique
+  slug        String     @unique
+  /// ISO 3166-1 alpha-2
+  code        String?
+  continent   Continent?
+  /// legacy Country.coverImage
+  flagMediaId BigInt?    @map("flag_media_id")
+
+  flag Media? @relation("CountryFlag", fields: [flagMediaId], references: [id])
+
   regions            Region[]
   collections        Collection[]
   postcards          Postcard[]
   collectionClusters CollectionCluster[]
   users              User[]
   memories           Memory[]
+
   @@map("countries")
 }
 
 model Region {
-  id        BigInt @id @default(autoincrement())
-  countryId BigInt @map("country_id")
+  id        BigInt   @id @default(autoincrement())
+  countryId BigInt   @map("country_id")
   name      String
   slug      String
-  country Country @relation(fields: [countryId], references: [id])
-  cities             City[]
-  collections        Collection[]
-  postcards          Postcard[]
-  collectionClusters CollectionCluster[]
-  users              User[]
-  memories           Memory[]
-  @@unique([name, countryId])
-  @@map("regions")
-}
+  /// centroid, for map default zoom (inherited from the removed City tier)
+  lat       Decimal? @db.Decimal(9, 6)
+  lng       Decimal? @db.Decimal(9, 6)
 
-model City {
-  id       BigInt   @id @default(autoincrement())
-  regionId BigInt   @map("region_id")
-  name     String
-  slug     String
-  /// centroid, for map default zoom
-  lat      Decimal? @db.Decimal(9, 6)
-  lng      Decimal? @db.Decimal(9, 6)
-  region Region @relation(fields: [regionId], references: [id])
+  country Country @relation(fields: [countryId], references: [id])
+
   localities         Locality[]
   collections        Collection[]
   postcards          Postcard[]
   collectionClusters CollectionCluster[]
   users              User[]
   memories           Memory[]
-  @@unique([name, regionId])
-  @@map("cities")
+
+  @@unique([name, countryId])
+  @@map("regions")
 }
 
+/// R1: parents directly to Region. `google_place_id` is the intended long-term
+/// uniqueness key (the neighborhood/sublocality place_id — coarser than the
+/// building-level google_place_id inside a Collection/Postcard location
+/// component). It has no legacy source and is populated by the Gmap Address
+/// Enrichment workstream, so (name, region_id) remains the load-time key.
 model Locality {
-  id     BigInt   @id @default(autoincrement())
-  cityId BigInt   @map("city_id")
-  name   String
-  slug   String
+  id            BigInt   @id @default(autoincrement())
+  regionId      BigInt   @map("region_id")
+  name          String
+  slug          String
+  googlePlaceId String?  @unique @map("google_place_id")
   /// optional centroid
-  lat    Decimal? @db.Decimal(9, 6)
-  lng    Decimal? @db.Decimal(9, 6)
-  city City @relation(fields: [cityId], references: [id])
-  collections        Collection[]
-  postcards          Postcard[]
-  collectionClusters CollectionCluster[]
-  users              User[]
-  memories           Memory[]
-  @@unique([name, cityId])
+  lat           Decimal? @db.Decimal(9, 6)
+  lng           Decimal? @db.Decimal(9, 6)
+
+  region Region @relation(fields: [regionId], references: [id])
+
+  collections Collection[]
+  postcards   Postcard[]
+  users       User[]
+  memories    Memory[]
+
+  @@unique([name, regionId])
   @@map("localities")
 }
 
@@ -464,54 +569,67 @@ model Locality {
 // never schema changes.
 // =============================================================================
 
+/// Scoped to EITHER a CollectionType (Property Type, Cuisine, ...) or a
+/// SubcollectionType (Journey Theme). Both nullable; null on both = applies
+/// broadly (e.g. 'Experience').
 model FacetType {
-  id                        BigInt  @id @default(autoincrement())
-  /// Property Type, Experience Theme, Cuisine...
-  name                      String
-  slug                      String  @unique
-  /// scopes relevance; null = applies broadly
-  appliesToCollectionTypeId BigInt? @map("applies_to_collection_type_id")
+  id                           BigInt  @id @default(autoincrement())
+  /// Type, Cuisine, Setting, Category, Experience, Theme...
+  name                         String
+  slug                         String  @unique
+  appliesToCollectionTypeId    BigInt? @map("applies_to_collection_type_id")
+  appliesToSubcollectionTypeId BigInt? @map("applies_to_subcollection_type_id")
   /// single-select (Property Type) vs multi-select (Cuisine)
-  allowsMultiple            Boolean @default(false) @map("allows_multiple")
-  appliesToCollectionType CollectionType? @relation(fields: [appliesToCollectionTypeId], references: [id])
-  values                  FacetValue[]
+  allowsMultiple               Boolean @default(false) @map("allows_multiple")
+
+  appliesToCollectionType    CollectionType?    @relation(fields: [appliesToCollectionTypeId], references: [id])
+  appliesToSubcollectionType SubcollectionType? @relation(fields: [appliesToSubcollectionTypeId], references: [id])
+  values                     FacetValue[]
+
   @@map("facet_types")
 }
 
 model FacetValue {
   id          BigInt @id @default(autoincrement())
   facetTypeId BigInt @map("facet_type_id")
-  /// e.g. Glamping, Cultural, Indian, Boutique Stays, Signature Experiences
+  /// e.g. Glamping, Cultural, Indian, Beachfront, Bar
   name        String
   slug        String
+
   facetType   FacetType         @relation(fields: [facetTypeId], references: [id])
   assignments FacetAssignment[]
+
   @@unique([facetTypeId, slug])
   @@map("facet_values")
 }
 
-/// Polymorphic join: owned_id points at Collection.id OR Postcard.id depending
-/// on owned_type. No DB-level FK — enforce in the service layer.
-/// This is the single mechanism for sub-type classification (the earlier
-/// Category/CollectionCategory entities were removed as duplicates).
+/// Polymorphic join: owned_id points at Collection.id, Postcard.id OR
+/// Subcollection.id depending on owned_type. No DB-level FK — enforce in the
+/// service layer. This is the single mechanism for sub-type classification
+/// (the earlier Category/CollectionCategory entities were removed as
+/// duplicates, and the Postcard<->Tag M2M was removed for the same reason).
 model FacetAssignment {
   id           BigInt         @id @default(autoincrement())
   ownedType    FacetOwnedType @map("owned_type")
   ownedId      BigInt         @map("owned_id")
   facetValueId BigInt         @map("facet_value_id")
+
   facetValue FacetValue @relation(fields: [facetValueId], references: [id], onDelete: Cascade)
+
   @@unique([ownedType, ownedId, facetValueId])
   @@index([ownedType, ownedId])
   @@map("facet_assignments")
 }
 
+/// Curated interest vocabulary used by the persona engine. Legacy content tags
+/// migrate to FacetValue under FacetType 'Experience', NOT here.
 model Tag {
   id   BigInt @id @default(autoincrement())
-  /// granular postcard-level features: stargazing, infinity pool
   name String @unique
   slug String @unique
-  postcards       Postcard[]       @relation("PostcardTags")
+
   userPersonaTags UserPersonaTag[]
+
   @@map("tags")
 }
 
@@ -520,34 +638,42 @@ model Tag {
 // =============================================================================
 
 model Company {
-  id           BigInt        @id @default(autoincrement())
-  name         String
-  slug         String        @unique
-  contactEmail String?       @map("contact_email")
-  contactPhone String?       @map("contact_phone")
-  website      String?
-  iconMediaId  BigInt?       @map("icon_media_id")
-  status       CompanyStatus @default(pending)
-  iconMedia Media? @relation("CompanyIcon", fields: [iconMediaId], references: [id])
+  id                BigInt        @id @default(autoincrement())
+  title             String
+  slug              String        @unique
+  contactEmail      String?       @map("contact_email")
+  contactPhone      String?       @map("contact_phone")
+  website           String?
+  /// legacy Company.icon
+  logoMediaId       BigInt?       @map("logo_media_id")
+  coverImageMediaId BigInt?       @map("cover_image_media_id")
+  status            CompanyStatus @default(pending)
+
+  logo       Media? @relation("CompanyLogo", fields: [logoMediaId], references: [id])
+  coverImage Media? @relation("CompanyCoverImage", fields: [coverImageMediaId], references: [id])
+
   collections        Collection[]
   subcollections     Subcollection[]
   collectionClusters CollectionCluster[]
   userRoles          UserRole[]
+
   @@map("companies")
 }
 
 model UserType {
   id        BigInt  @id @default(autoincrement())
-  /// Member, Partner, Staff Editor, Admin
-  name      String
+  /// Regular, SuperAdmin, Partner, Staff Editor, ...
+  title     String
   slug      String  @unique
-  /// ordinary member
+  /// ordinary member — the fallback role assigned when a user has no type
   isDefault Boolean @default(false) @map("is_default")
   /// can author/submit content
   isCreator Boolean @default(false) @map("is_creator")
   /// admin-level access
   isAdmin   Boolean @default(false) @map("is_admin")
+
   userRoles UserRole[]
+
   @@map("user_types")
 }
 
@@ -557,10 +683,10 @@ model User {
   email         String    @unique
   /// legacy Strapi uid (from fullName) — public profile URL identifier
   slug          String?   @unique
-
   firstName     String?   @map("first_name")
   lastName      String?   @map("last_name")
-  /// replaces Strapi's users-permissions plugin
+  /// replaces Strapi's users-permissions plugin. NEVER carried over from
+  /// legacy (shared hardcoded social-login hash) — issue fresh via reset flow.
   passwordHash  String?   @map("password_hash")
   authProvider  String?   @map("auth_provider")
   providerId    String?   @map("provider_id")
@@ -579,29 +705,54 @@ model User {
   priority      Int       @default(0)
   countryId     BigInt?   @map("country_id")
   regionId      BigInt?   @map("region_id")
-  cityId        BigInt?   @map("city_id")
   localityId    BigInt?   @map("locality_id")
-  /// Member-specific
-  tier          UserTier?
+  /// legacy free-text city — informational only, not a geo tier (R1)
+  cityName      String?   @map("city_name")
   /// Admin access flag
   isAdmin       Boolean   @default(false) @map("is_admin")
+
   profilePic Media?    @relation("UserProfilePic", fields: [profilePicId], references: [id])
   coverImage Media?    @relation("UserCoverImage", fields: [coverImageId], references: [id])
   country    Country?  @relation(fields: [countryId], references: [id])
   region     Region?   @relation(fields: [regionId], references: [id])
-  city       City?     @relation(fields: [cityId], references: [id])
   locality   Locality? @relation(fields: [localityId], references: [id])
-  roles        UserRole[]       @relation("UserRoles")
-  managedRoles UserRole[]       @relation("RoleManager")
-  circles      Circle[]
-  memories     Memory[]         @relation("UserMemories")
-  taggedIn     Memory[]         @relation("MemoryTaggedUsers")
-  events       UserEvent[]
-  enquiries    Enquiry[]
-  responses    Response[]       @relation("UserResponses")
-  persona      UserPersona?
-  personaTags  UserPersonaTag[]
+
+  roles                UserRole[]      @relation("UserRoles")
+  managedRoles         UserRole[]      @relation("RoleManager")
+  memberships          Membership[]
+  circles              Circle[]
+  ownedCollections     Collection[]    @relation("CollectionOwner")
+  assignedCollections  Collection[]    @relation("CollectionAssignee")
+  authoredPostcards    Postcard[]      @relation("PostcardAuthor")
+  createdSubcollections Subcollection[] @relation("SubcollectionCreator")
+  memories             Memory[]        @relation("UserMemories")
+  taggedIn             Memory[]        @relation("MemoryTaggedUsers")
+  events               UserEvent[]
+  enquiries            Enquiry[]       @relation("EnquiryRequester")
+  assignedEnquiries    Enquiry[]       @relation("EnquiryAssignee")
+  responses            Response[]      @relation("UserResponses")
+  persona              UserPersona?
+  personaTags          UserPersonaTag[]
+
   @@map("users")
+}
+
+/// R2: tier lives here, not on User, so history and expiry are representable.
+/// There is intentionally NO unique constraint on user_id — the "current"
+/// membership is the active, unexpired row (a service-layer invariant).
+model Membership {
+  id        BigInt           @id @default(autoincrement())
+  userId    BigInt           @map("user_id")
+  tier      MembershipTier   @default(free)
+  startedAt DateTime         @default(now()) @map("started_at")
+  /// null = no expiry / not applicable
+  endsAt    DateTime?        @map("ends_at")
+  status    MembershipStatus @default(active)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("memberships")
 }
 
 /// Replaces a single user_type_id column — one person can hold multiple roles
@@ -617,19 +768,23 @@ model UserRole {
   managerUserId BigInt?        @map("manager_user_id")
   grantedAt     DateTime       @default(now()) @map("granted_at")
   status        UserRoleStatus @default(active)
+
   user     User     @relation("UserRoles", fields: [userId], references: [id], onDelete: Cascade)
   userType UserType @relation(fields: [userTypeId], references: [id])
   company  Company? @relation(fields: [companyId], references: [id])
   manager  User?    @relation("RoleManager", fields: [managerUserId], references: [id])
+
+  @@unique([userId, userTypeId])
   @@index([userId])
   @@index([companyId])
   @@map("user_roles")
 }
 
 // =============================================================================
-// CIRCLE — the universal relationship layer
+// CIRCLE — the universal engagement layer (R3/R4)
 // Replaces Bookmark, FollowAlbum, FollowCompany, FollowAffiliate, FollowTag,
-// FollowCityGuide, and User-follows-User.
+// FollowCityGuide and User-follows-User — ALL as relationship='bookmark',
+// differentiated only by owned_type.
 // =============================================================================
 
 /// Polymorphic: owned_id points at the table indicated by owned_type
@@ -646,11 +801,14 @@ model Circle {
   /// only for booked postcards inside a forked Journey (real calendar date)
   sequenceDate    DateTime?          @map("sequence_date") @db.Date
   addedAt         DateTime           @default(now()) @map("added_at")
+
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   sourceEnquiry Enquiry? @relation(fields: [sourceEnquiryId], references: [id])
+
   @@unique([userId, ownedType, ownedId, relationship])
-  /// "properly indexed on (user_id, relationship, owned_type)" — answers every
-  /// variant of "show me everything connected to this person"
+  /// locked query pattern: profile-page "saved items" filters on
+  /// (user_id, owned_type) — this index, not the 3-column one, serves it
+  @@index([userId, ownedType])
   @@index([userId, relationship, ownedType])
   @@index([ownedType, ownedId])
   @@map("circles")
@@ -666,8 +824,10 @@ model ResponseType {
   name        String   @unique
   slug        String   @unique
   description String?
+
   fields    ResponseField[]
   responses Response[]
+
   @@map("response_types")
 }
 
@@ -684,24 +844,30 @@ model ResponseField {
   description    String?
   /// display order in form
   order          Int     @default(0)
+
   responseType ResponseType @relation(fields: [responseTypeId], references: [id], onDelete: Cascade)
+
   @@unique([responseTypeId, fieldName])
   @@map("response_fields")
 }
 
-/// Stores user-submitted responses/form submissions
+/// Stores user-submitted responses/form submissions.
+/// user_id is NULLABLE — the legacy ContactUs form accepts submissions from
+/// logged-out visitors.
 model Response {
-  id            BigInt    @id @default(autoincrement())
+  id             BigInt   @id @default(autoincrement())
   responseTypeId BigInt   @map("response_type_id")
-  userId        BigInt    @map("user_id")
-  /// JSON object containing all field values {message: "...", email: "...", rating: 5}
-  data          Json
-  /// pending, reviewed, archived, spam, etc.
-  status        String    @default("pending")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  userId         BigInt?  @map("user_id")
+  /// JSON object containing all field values {question: "...", email: "..."}
+  data           Json
+  /// open, pending, reviewed, archived, spam, etc.
+  status         String   @default("pending")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
   responseType ResponseType @relation(fields: [responseTypeId], references: [id], onDelete: Cascade)
-  user         User          @relation("UserResponses", fields: [userId], references: [id], onDelete: Cascade)
+  user         User?        @relation("UserResponses", fields: [userId], references: [id], onDelete: SetNull)
+
   @@index([responseTypeId])
   @@index([userId, createdAt])
   @@map("responses")
@@ -715,8 +881,11 @@ model Memory {
   id          BigInt    @id @default(autoincrement())
   /// creator/owner of the memory
   userId      BigInt    @map("user_id")
-  /// null = standalone memory not tied to any postcard
+  /// content anchors — both nullable; null on both = standalone memory.
+  /// Legacy dx_card anchors resolve to postcard_id; legacy album anchors
+  /// resolve to collection_id (Properties) or postcard_id (R/E/S).
   postcardId  BigInt?   @map("postcard_id")
+  collectionId BigInt?  @map("collection_id")
   name        String
   slug        String    @unique
   intro       String?
@@ -725,52 +894,62 @@ model Memory {
   /// copied from the postcard at creation, or set manually if standalone
   countryId   BigInt?   @map("country_id")
   regionId    BigInt?   @map("region_id")
-  cityId      BigInt?   @map("city_id")
   localityId  BigInt?   @map("locality_id")
   externalUrl String?   @map("external_url")
+  internalUrl String?   @map("internal_url")
+  signature   String?
   /// 'selected' = visible only to tagged users
   shareType   ShareType @default(private) @map("share_type")
   createdAt   DateTime  @default(now()) @map("created_at")
-  user     User      @relation("UserMemories", fields: [userId], references: [id], onDelete: Cascade)
-  postcard Postcard? @relation(fields: [postcardId], references: [id])
-  country  Country?  @relation(fields: [countryId], references: [id])
-  region   Region?   @relation(fields: [regionId], references: [id])
-  city     City?     @relation(fields: [cityId], references: [id])
-  locality Locality? @relation(fields: [localityId], references: [id])
+
+  user       User        @relation("UserMemories", fields: [userId], references: [id], onDelete: Cascade)
+  postcard   Postcard?   @relation(fields: [postcardId], references: [id])
+  collection Collection? @relation(fields: [collectionId], references: [id])
+  country    Country?    @relation(fields: [countryId], references: [id])
+  region     Region?     @relation(fields: [regionId], references: [id])
+  locality   Locality?   @relation(fields: [localityId], references: [id])
+
   /// multiple photos/videos
   gallery     Media[] @relation("MemoryGallery")
   /// other people tagged in this memory
   taggedUsers User[]  @relation("MemoryTaggedUsers")
+
   @@index([userId])
   @@index([postcardId])
+  @@index([collectionId])
   @@map("memories")
 }
 
 /// Raw, append-only behavioral log
 model UserEvent {
   id          BigInt            @id @default(autoincrement())
-  userId      BigInt            @map("user_id")
+  userId      BigInt?           @map("user_id")
   eventType   UserEventType     @map("event_type")
   /// polymorphic, nullable
   subjectType EventSubjectType? @map("subject_type")
   subjectId   BigInt?           @map("subject_id")
-  /// populated when event_type = search
+  /// populated when event_type is one of the search events
   searchQuery String?           @map("search_query")
   metadata    Json?
   occurredAt  DateTime          @default(now()) @map("occurred_at")
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, occurredAt])
   @@index([eventType, occurredAt])
+  @@index([subjectType, subjectId])
   @@map("user_events")
 }
 
 /// Periodically recomputed, derived profile (vs UserEvent's raw log)
 model UserPersona {
-  id             BigInt        @id @default(autoincrement())
-  userId         BigInt        @unique @map("user_id")
+  id             BigInt         @id @default(autoincrement())
+  userId         BigInt         @unique @map("user_id")
   priceAffinity  PriceAffinity? @map("price_affinity")
   lastComputedAt DateTime?      @map("last_computed_at")
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("user_personas")
 }
 
@@ -781,47 +960,79 @@ model UserPersonaTag {
   tagId     BigInt   @map("tag_id")
   weight    Decimal  @db.Decimal(6, 4)
   updatedAt DateTime @updatedAt @map("updated_at")
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
   @@id([userId, tagId])
   @@index([tagId, weight])
   @@map("user_persona_tags")
 }
 
 // =============================================================================
-// REFERENCED-BUT-NOT-DEFINED ENTITIES (stubs — extend as needed)
+// MEDIA & ENQUIRY
 // =============================================================================
 
+/// Mirrors the legacy Strapi upload `files` record field-for-field.
+/// `legacy_id` is the permanent old-id -> new-id mapping the migration tracker
+/// requires, and is the idempotency key for re-runs.
 model Media {
-  id       BigInt  @id @default(autoincrement())
-  url      String
-  mimeType String? @map("mime_type")
-  alt      String?
-  width    Int?
-  height   Int?
+  id               BigInt   @id @default(autoincrement())
+  legacyId         BigInt?  @unique @map("legacy_id")
+  url              String
+  name             String?
+  /// legacy alternativeText
+  alt              String?
+  caption          String?
+  mimeType         String?  @map("mime_type")
+  ext              String?
+  hash             String?
+  /// Strapi stores size in KB as a float
+  size             Decimal? @db.Decimal(14, 2)
+  provider         String?
+  previewUrl       String?  @map("preview_url")
+  providerMetadata Json?    @map("provider_metadata")
+  width            Int?
+  height           Int?
+
   collectionCovers    Collection[]        @relation("CollectionCoverMedia")
   postcardCovers      Postcard[]          @relation("PostcardCoverMedia")
   subcollectionCovers Subcollection[]     @relation("SubcollectionCoverMedia")
   clusterCovers       CollectionCluster[] @relation("CollectionClusterCoverMedia")
-  userProfilePics  User[]       @relation("UserProfilePic")
-  userCoverImages  User[]       @relation("UserCoverImage")
-  memoryGalleries  Memory[]     @relation("MemoryGallery")
-  companyIcons     Company[]    @relation("CompanyIcon")
+  countryFlags        Country[]           @relation("CountryFlag")
+  userProfilePics     User[]              @relation("UserProfilePic")
+  userCoverImages     User[]              @relation("UserCoverImage")
+  memoryGalleries     Memory[]            @relation("MemoryGallery")
+  companyLogos        Company[]           @relation("CompanyLogo")
+  companyCoverImages  Company[]           @relation("CompanyCoverImage")
+
+  @@index([url])
   @@map("media")
 }
 
+/// Polymorphic subject from day one — today only Journeys (Subcollection) take
+/// enquiries, but Properties (Collection) and Events (Postcard) are expected to.
 model Enquiry {
-  id              BigInt   @id @default(autoincrement())
-  userId          BigInt   @map("user_id")
-  subcollectionId BigInt   @map("subcollection_id")
-  message         String?
-  status          String   @default("pending")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subcollection Subcollection @relation(fields: [subcollectionId], references: [id], onDelete: Cascade)
-  circles       Circle[]
+  id                BigInt             @id @default(autoincrement())
+  userId            BigInt             @map("user_id")
+  subjectType       EnquirySubjectType @map("subject_type")
+  subjectId         BigInt             @map("subject_id")
+  startDate         DateTime?          @map("start_date") @db.Date
+  endDate           DateTime?          @map("end_date") @db.Date
+  numberOfTravelers Int?               @map("number_of_travelers")
+  message           String?
+  status            EnquiryStatus      @default(new)
+  /// R3: concierge staff handling this enquiry — a direct FK, not a Circle
+  assignedToUserId  BigInt?            @map("assigned_to_user_id")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  user       User     @relation("EnquiryRequester", fields: [userId], references: [id], onDelete: Cascade)
+  assignedTo User?    @relation("EnquiryAssignee", fields: [assignedToUserId], references: [id])
+  circles    Circle[]
+
   @@index([userId])
-  @@index([subcollectionId])
+  @@index([subjectType, subjectId])
+  @@index([assignedToUserId])
   @@map("enquiries")
 }

@@ -19,7 +19,7 @@ onto. Real known values where they exist, 2–3 samples elsewhere:
 |---|---|---|
 | `collection_types` | Properties, Restaurants, Events, Shopping, Destination Expert | every Collection & Postcard |
 | `subcollection_types` | Journey (under Properties) | every Subcollection |
-| `collection_cluster_types` | City Guide, Partner Affiliation | every CollectionCluster |
+| `collection_cluster_types` | City Guide — including `collection_type_ids`, the collection types it is a cluster **of** (Restaurants → Events → Shopping, in display order) | every CollectionCluster; the array also scopes the geo-derived City Guide entries |
 | `user_types` | Member *(default)*, Partner *(creator)*, Staff Editor *(creator)*, Admin *(admin)* | every UserRole — the role *rows* are created by the app / user migration, only the types are seeded |
 | `tags` | Stargazing, Infinity Pool, Farm to Table | sample postcard feature tags |
 | `response_types` | contact_form, feedback, newsletter_signup | every Response |

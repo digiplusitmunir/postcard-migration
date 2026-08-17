@@ -1,233 +1,147 @@
 """City Guide migration — legacy Strapi `city_guides` -> new
-`collection_clusters` under CollectionClusterType 'City Guide' (tracker row
-#17), plus geo-derived `collection_cluster_entries`.
+`collection_clusters` under CollectionClusterType 'City Guide'.
 
-Migration step 10 of the run order (needs geo, media and directory/album
-data in the DB; no per-env map files consumed).
+Migration step 11 of the run order (needs geo and media in the DB; no per-env
+map files consumed).
 
-Scope decisions (2026-08-10):
-- Legacy `region` maps to the new `cities` tier — v2 cities were synthesized
-  1:1 from legacy regions in the geo migration, so the guide's region name
-  is matched against cities.name. city_id = the match, region_id = that
-  city's parent region, country_id = legacy country by name (falls back to
-  the region's country). Ambiguous/missing city names -> manual review.
-- Legacy has NO name field — `name` is derived from the matched city's name
-  (guides without a region fall back to a title-cased slug).
-- description -> intro; story stays NULL (no legacy source).
-- image -> cover_media_id, communityLink -> community_link (both columns
-  added by migration 20260810080000_add_cluster_cover_and_community_link).
-- slug: legacy slug else slugify(name), de-duplicated in-run.
-- status: 'published' -> live, else draft.
-- Entries: legacy city-guides carry NO explicit content links (the legacy
-  frontend listed content by region). When DERIVE_ENTRIES is True (default),
-  entries are derived from geo **scoped by the cluster type**: only content
-  whose collection type is listed in `cluster_type_collection_types` for the
-  cluster's type is pulled in. City Guide is seeded as a cluster of
-  Restaurants + Events + Shopping, so Properties collections are NOT derived.
-  Live in-scope collections become entry_type='collection'; live in-scope
-  postcards with no collection become entry_type='postcard' (which is where
-  Restaurants/Events/Shopping content lives since the album split). Both at
-  priority 0 — re-order in the CMS later.
-  ON CONFLICT DO NOTHING: hand-curated additions survive re-runs, rows are
-  only ever added, never removed. Set DERIVE_ENTRIES = False to curate
-  entries by hand instead.
-- Dropped: follow_city_guides (deferred -> tracker #24, blocked on the
-  Circle 'follow' relationship value), timestamps.
-- Writes `legacy_cityguide_id_map_dev/_prod.json` (legacy city-guide id ->
-  new cluster id) for the follow-city-guide migration (#24).
+TRACKER REVISION R1 (2026-08-05) — City Guides re-anchor to REGION.
+The previous version of this script matched the legacy `region` name against
+the `cities` table, because geo_migration.py used to synthesize one placeholder
+city per region. Both the placeholder cities and the City tier are gone, so the
+guide's region now resolves directly against `regions`.
 
-Idempotent — clusters upsert on slug, entries insert ON CONFLICT DO NOTHING.
-Safe to re-run.
+TRACKER REVISION R6 (2026-08-12) — cluster membership is DERIVED, not stored.
+There is no `collection_cluster_entries` table any more. A cluster type declares
+which collection types are eligible (`collection_type_ids`) and which column
+binds content to a cluster instance (`match_field`, 'region_id' for City Guide);
+rendering a guide page is a query, not a stored join. This script therefore only
+migrates the guides themselves — the previous geo-derivation step is gone, along
+with its stale-entry pruning problem (derived rows were inserted but never
+deleted, so a narrowed scope left orphans behind for ever).
+
+Field mapping (verified against the live API — 9 guides in prod)
+  region        -> region_id      (matched by name, scoped by the legacy country)
+  country       -> country_id     (kept denormalized, as v1 does)
+  description   -> intro
+  image         -> cover_media_id
+  communityLink -> community_link
+  slug          -> slug
+  status        -> status         ('published' -> live, else draft)
+  (none)        -> name           legacy has NO name field; derived from the
+                                  matched region, else a title-cased slug
+
+Dropped: follow_city_guides (migrated by scripts/follows.py into
+circles(owned_type='collection_cluster')), timestamps.
+
+Writes `legacy_cityguide_id_map{_dev,_prod}.json` for scripts/follows.py.
+
+Idempotent — clusters upsert on slug. Safe to re-run.
 
 Usage:
     python scripts/cityguide.py
 """
 
-import json
-import os
-import re
-from pathlib import Path
+from collections import Counter
 
-import requests
-import psycopg
-from dotenv import load_dotenv
-
-ROOT = Path(__file__).resolve().parents[1]
-load_dotenv(ROOT / ".env")
-
-CMS_BASE_URL = os.environ["CMS_BASE_URL"].rstrip("/")
-HEADERS = {"Authorization": f"Bearer {os.environ['CMS_API_TOKEN']}"}
-DATABASE_URL = os.environ["DATABASE_URL"]
-
-# map files are suffixed per environment, keyed off the DB name in DATABASE_URL
-ENV_SUFFIX = {"development": "_dev", "production": "_prod"}.get(DATABASE_URL.rsplit("/", 1)[-1], "")
-
-# derive collection_cluster_entries from geo (live collections + live
-# collection-less postcards in the guide's region); set to False to keep
-# clusters empty for hand-curation instead
-DERIVE_ENTRIES = True
-
-
-def slugify(text):
-    return re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-") or None
-
-
-def attrs(item):
-    """Entry fields — Strapi v4 nests them under 'attributes', v5 is flat."""
-    return item.get("attributes", item)
-
-
-def rel(obj):
-    """Unwrap a populated relation — v4: {'data': {'attributes': {...}}}, v5: flat dict."""
-    if isinstance(obj, dict) and "data" in obj:
-        obj = obj["data"]
-    if not obj:
-        return None
-    return obj.get("attributes", obj)
-
-
-def rel_many(obj):
-    """Unwrap a populated to-many relation into a list of flat dicts."""
-    if isinstance(obj, dict) and "data" in obj:
-        obj = obj["data"]
-    return [attrs(x) for x in (obj or [])]
-
-
-def fetch_all(path, params=None):
-    """Fetch every page of a Strapi collection endpoint (data/meta envelope)."""
-    items, page = [], 1
-    while True:
-        p = {"pagination[page]": page, "pagination[pageSize]": 100, "sort": "id", **(params or {})}
-        r = requests.get(f"{CMS_BASE_URL}{path}", headers=HEADERS, params=p, timeout=120)
-        r.raise_for_status()
-        body = r.json()
-        items.extend(body["data"])
-        pg = body.get("meta", {}).get("pagination", {})
-        if page >= pg.get("pageCount", 1):
-            return items
-        page += 1
+from _common import (MediaResolver, SlugAllocator, attrs, connect, fetch_all,
+                     rel, save_map, slugify)
 
 
 def load_lookups(conn):
-    """City Guide cluster-type id (seeded), cities by lowercase name (legacy
-    region -> v2 city), regions for the country fallback, countries by name,
-    media by normalized url (same as scripts/media.py)."""
+    """City Guide cluster-type id (seeded), regions keyed by (name, country) and
+    by name alone, countries by name."""
     with conn.cursor() as cur:
-        cur.execute("SELECT id FROM collection_cluster_types WHERE slug = 'city-guide'")
+        cur.execute("SELECT id, match_field, collection_type_ids "
+                    "FROM collection_cluster_types WHERE slug = 'city-guide'")
         row = cur.fetchone()
-        assert row, "collection_cluster_types has no 'city-guide' row — run scripts/seed.py first"
-        city_guide_type_id = row[0]
+        if not row:
+            raise SystemExit("collection_cluster_types has no 'city-guide' row — "
+                             "run scripts/seed.py first")
+        city_guide_type_id, match_field, scope_ids = row
 
-        cur.execute("SELECT LOWER(name), id, region_id, name FROM cities")
-        cities_by_name = {}
-        for lname, cid, rid, name in cur.fetchall():
-            cities_by_name.setdefault(lname, []).append((cid, rid, name))
-
-        cur.execute("SELECT id, country_id FROM regions")
-        country_by_region = dict(cur.fetchall())
-
+        cur.execute("SELECT LOWER(name), country_id, id, name FROM regions")
+        regions = cur.fetchall()
         cur.execute("SELECT LOWER(name), id FROM countries")
         country_by_name = dict(cur.fetchall())
 
-        cur.execute("SELECT url, id FROM media")
-        media_by_url = dict(cur.fetchall())
+    region_by_name_country = {(n, c): (i, disp) for n, c, i, disp in regions}
+    region_by_name = {}
+    for n, c, i, disp in regions:
+        region_by_name.setdefault(n, []).append((i, c, disp))
 
-    print(f"city-guide cluster_type id: {city_guide_type_id}")
-    print(f"lookups: {len(cities_by_name)} city names, {len(country_by_region)} regions, "
-          f"{len(country_by_name)} countries, {len(media_by_url)} media")
-    return city_guide_type_id, cities_by_name, country_by_region, country_by_name, media_by_url
+    print(f"city-guide cluster_type id: {city_guide_type_id} "
+          f"(match_field={match_field}, scopes {len(scope_ids or [])} collection types)")
+    if not scope_ids:
+        print("  WARNING: collection_type_ids is empty — a City Guide page would "
+              "resolve to nothing. Re-run scripts/seed.py.")
+    print(f"lookups: {len(region_by_name)} region names, {len(country_by_name)} countries")
+    return city_guide_type_id, region_by_name_country, region_by_name, country_by_name
 
 
 def migrate_city_guides(conn, city_guides):
-    """city-guide -> collection_clusters. Returns
-    ({legacy city-guide id: new cluster id}, {legacy city-guide id: region_id})."""
-    (city_guide_type_id, cities_by_name, country_by_region,
-     country_by_name, media_by_url) = load_lookups(conn)
+    """city-guide -> collection_clusters. Returns {legacy id: new cluster id}."""
+    (city_guide_type_id, region_by_name_country,
+     region_by_name, country_by_name) = load_lookups(conn)
+    media = MediaResolver(conn)
+    slugs = SlugAllocator(fallback="city-guide")
 
-    def media_id_for(image, cur):
-        """Find-or-create a media row for a populated Strapi file."""
-        if not image or not image.get("url"):
-            return None
-        url = image["url"].strip()
-        if url.startswith("/"):
-            url = CMS_BASE_URL + url
-        if url in media_by_url:
-            return media_by_url[url]
-        cur.execute(
-            "INSERT INTO media (url, mime_type, alt, width, height) VALUES (%s, %s, %s, %s, %s) RETURNING id",
-            (url, image.get("mime"), image.get("alternativeText") or image.get("name"),
-             image.get("width"), image.get("height")),
-        )
-        media_by_url[url] = cur.fetchone()[0]
-        return media_by_url[url]
-
-    used_slugs = set()
-
-    def unique_slug(base):
-        base = base or "city-guide"
-        slug, n = base, 2
-        while slug in used_slugs:
-            slug = f"{base}-{n}"
-            n += 1
-        used_slugs.add(slug)
-        return slug
-
-    cityguide_map = {}   # legacy city-guide id -> new cluster id
-    region_of = {}       # legacy city-guide id -> region_id (for the derived-entries step)
-
-    no_region, city_missing, city_ambiguous, missing_country = [], [], [], []
-    status_counts = {}
+    cityguide_map = {}
+    no_region, region_missing, region_ambiguous, missing_country = [], [], [], []
+    status_counts = Counter()
 
     with conn.cursor() as cur:
         for cg in city_guides:
             a = attrs(cg)
 
-            # legacy region -> v2 city (cities were synthesized 1:1 from regions)
-            region = rel(a.get("region"))
-            city_id = region_id = None
-            city_name = None
-            if not region:
-                no_region.append((cg["id"], a.get("slug")))
-            else:
-                matches = cities_by_name.get((region.get("name") or "").strip().lower(), [])
-                if len(matches) == 1:
-                    city_id, region_id, city_name = matches[0]
-                elif not matches:
-                    city_missing.append((cg["id"], region.get("name")))
-                else:
-                    city_ambiguous.append((cg["id"], region.get("name"), len(matches)))
-
-            # country: legacy relation by name, else the matched region's country
+            # country first — it disambiguates the region match below
             country = rel(a.get("country"))
             country_id = country_by_name.get((country.get("name") or "").strip().lower()) if country else None
             if country and not country_id:
                 missing_country.append((cg["id"], country.get("name")))
-            country_id = country_id or (country_by_region.get(region_id) if region_id else None)
 
-            # legacy has NO name field -> derive from the matched city, else the slug
-            name = city_name or (a.get("slug") or f"city-guide-{cg['id']}").replace("-", " ").title()
+            # R1: legacy region -> regions (was: -> the placeholder cities tier).
+            # Region names are unique per COUNTRY, so use the legacy country
+            # when we have it and only fall back to a name-only match.
+            region = rel(a.get("region"))
+            region_id = region_name = None
+            if not region:
+                no_region.append((cg["id"], a.get("slug")))
+            else:
+                key = (region.get("name") or "").strip().lower()
+                if country_id and (key, country_id) in region_by_name_country:
+                    region_id, region_name = region_by_name_country[(key, country_id)]
+                else:
+                    matches = region_by_name.get(key, [])
+                    if len(matches) == 1:
+                        region_id, region_country, region_name = matches[0]
+                        country_id = country_id or region_country
+                    elif not matches:
+                        region_missing.append((cg["id"], region.get("name")))
+                    else:
+                        region_ambiguous.append((cg["id"], region.get("name"), len(matches)))
 
-            slug = unique_slug((a.get("slug") or "").strip() or slugify(name))
-            cover_id = media_id_for(rel(a.get("image")), cur)
+            # legacy has NO name field -> derive from the matched region, else the slug
+            name = region_name or (a.get("slug") or f"city-guide-{cg['id']}").replace("-", " ").title()
+
+            slug = slugs.take((a.get("slug") or "").strip() or slugify(name))
+            cover_id = media.resolve(cur, rel(a.get("image")))
 
             legacy_status = a.get("status")
-            status_counts[legacy_status] = status_counts.get(legacy_status, 0) + 1
             status = "live" if legacy_status == "published" else "draft"
+            status_counts[f"{legacy_status} -> {status}"] += 1
 
             cur.execute(
                 """
                 INSERT INTO collection_clusters
                     (cluster_type_id, name, slug, intro, story, country_id, region_id,
-                     city_id, locality_id, managed_by_company_id, cover_media_id,
-                     community_link, status)
-                VALUES (%s, %s, %s, %s, NULL, %s, %s, %s, NULL, NULL, %s, %s, %s)
+                     managed_by_company_id, cover_media_id, community_link, status)
+                VALUES (%s, %s, %s, %s, NULL, %s, %s, NULL, %s, %s, %s)
                 ON CONFLICT (slug) DO UPDATE
                 SET cluster_type_id = EXCLUDED.cluster_type_id,
                     name = EXCLUDED.name,
                     intro = EXCLUDED.intro,
                     country_id = EXCLUDED.country_id,
                     region_id = EXCLUDED.region_id,
-                    city_id = EXCLUDED.city_id,
                     cover_media_id = EXCLUDED.cover_media_id,
                     community_link = EXCLUDED.community_link,
                     status = EXCLUDED.status
@@ -235,71 +149,64 @@ def migrate_city_guides(conn, city_guides):
                 """,
                 (city_guide_type_id, name, slug,
                  (a.get("description") or "").strip() or None,
-                 country_id, region_id, city_id,
-                 cover_id,
+                 country_id, region_id, cover_id,
                  (a.get("communityLink") or "").strip() or None,
                  status),
             )
             cityguide_map[cg["id"]] = cur.fetchone()[0]
-            if region_id:
-                region_of[cg["id"]] = region_id
 
     conn.commit()
     print(f"collection_clusters upserted: {len(cityguide_map)}")
-    print(f"legacy status counts (published -> live): {status_counts}")
+    print(f"status (legacy -> v2): {dict(status_counts)}")
+    print(f"media rows created by this step: {media.created}")
     print(f"MANUAL REVIEW no region ({len(no_region)}): {no_region}")
-    print(f"MANUAL REVIEW region name matched no v2 city ({len(city_missing)}): {city_missing}")
-    print(f"MANUAL REVIEW region name matched multiple v2 cities ({len(city_ambiguous)}): {city_ambiguous}")
+    print(f"MANUAL REVIEW region name matched no v2 region ({len(region_missing)}): {region_missing}")
+    print(f"MANUAL REVIEW region name in >1 country ({len(region_ambiguous)}): {region_ambiguous}")
     print(f"MANUAL REVIEW country not found ({len(missing_country)}): {missing_country}")
-    return cityguide_map, region_of
+    return cityguide_map
 
 
-def derive_entries(conn, cityguide_map, region_of):
-    """Geo-derived entries for every live item in the guide's region:
+def preview_derived_membership(conn):
+    """R6: show what each cluster would resolve to, without storing anything.
 
-    - `entry_type='collection'` for live collections (Properties), and
-    - `entry_type='postcard'` for live collection-less postcards, i.e. the
-      Restaurants/Events/Shopping albums that migrated straight into
-      `postcards` (they used to be collections and were picked up by the
-      collection branch alone).
-
-    Both at priority 0 — re-order in the CMS later.
+    This is the exact query the service layer runs to render a cluster page —
+    reproduced here as a migration sanity check, NOT as a write.
     """
-    collection_entries = postcard_entries = 0
     with conn.cursor() as cur:
-        for cg_id, cluster_id in cityguide_map.items():
-            region_id = region_of.get(cg_id)
-            if not region_id:
-                continue
-            cur.execute(
-                """
-                INSERT INTO collection_cluster_entries (cluster_id, entry_type, entry_id, priority)
-                SELECT %s, 'collection', c.id, 0
-                FROM collections c
-                WHERE c.region_id = %s AND c.status = 'live'
-                ON CONFLICT (cluster_id, entry_type, entry_id) DO NOTHING
-                """,
-                (cluster_id, region_id),
-            )
-            collection_entries += cur.rowcount
-            cur.execute(
-                """
-                INSERT INTO collection_cluster_entries (cluster_id, entry_type, entry_id, priority)
-                SELECT %s, 'postcard', p.id, 0
-                FROM postcards p
-                JOIN collection_types ct ON ct.id = p.collection_type_id
-                WHERE p.region_id = %s AND p.status = 'live'
-                  AND p.collection_id IS NULL
-                  AND ct.has_dedicated_collection = false
-                ON CONFLICT (cluster_id, entry_type, entry_id) DO NOTHING
-                """,
-                (cluster_id, region_id),
-            )
-            postcard_entries += cur.rowcount
+        cur.execute("""
+            SELECT cct.slug, cct.match_field,
+                   COALESCE(array_length(cct.collection_type_ids, 1), 0),
+                   string_agg(ct.name, ', ' ORDER BY s.ord)
+            FROM collection_cluster_types cct
+            LEFT JOIN unnest(cct.collection_type_ids) WITH ORDINALITY AS s(ct_id, ord) ON TRUE
+            LEFT JOIN collection_types ct ON ct.id = s.ct_id
+            GROUP BY cct.id, cct.slug, cct.match_field, cct.collection_type_ids
+            ORDER BY cct.priority, cct.slug
+        """)
+        print("\ncluster types (derivation config):")
+        for slug, match_field, n, names in cur.fetchall():
+            print(f"  {slug:16} match on {match_field:12} over {n} type(s): {names or 'NOTHING'}")
 
-    conn.commit()
-    print(f"collection_cluster_entries inserted this run: {collection_entries} collection, "
-          f"{postcard_entries} postcard")
+        # City Guide: match_field = region_id. Restaurants/Events/Shopping live
+        # in `postcards` (no Collection layer); Properties would live in
+        # `collections`. Both are counted so the config is verifiable.
+        cur.execute("""
+            SELECT cc.name, cc.status,
+                   (SELECT COUNT(*) FROM collections c
+                     WHERE c.collection_type_id = ANY(cct.collection_type_ids)
+                       AND c.region_id = cc.region_id AND c.status = 'live'),
+                   (SELECT COUNT(*) FROM postcards p
+                     WHERE p.collection_type_id = ANY(cct.collection_type_ids)
+                       AND p.region_id = cc.region_id AND p.status = 'live'
+                       AND p.collection_id IS NULL)
+            FROM collection_clusters cc
+            JOIN collection_cluster_types cct ON cct.id = cc.cluster_type_id
+            WHERE cct.slug = 'city-guide'
+            ORDER BY 4 DESC, cc.name
+        """)
+        print("\ncity guides — DERIVED membership (collections / postcards), nothing stored:")
+        for name, status, n_coll, n_pc in cur.fetchall():
+            print(f"  {name:30} [{status:5}]: {n_coll} / {n_pc}")
 
 
 def verify(conn):
@@ -307,50 +214,29 @@ def verify(conn):
         for label, q in [
             ("clusters total",      "SELECT COUNT(*) FROM collection_clusters"),
             ("city guides",         "SELECT COUNT(*) FROM collection_clusters cc JOIN collection_cluster_types t ON t.id = cc.cluster_type_id WHERE t.slug = 'city-guide'"),
-            ("with city",           "SELECT COUNT(*) FROM collection_clusters WHERE city_id IS NOT NULL"),
             ("with region",         "SELECT COUNT(*) FROM collection_clusters WHERE region_id IS NOT NULL"),
             ("with country",        "SELECT COUNT(*) FROM collection_clusters WHERE country_id IS NOT NULL"),
             ("with cover media",    "SELECT COUNT(*) FROM collection_clusters WHERE cover_media_id IS NOT NULL"),
             ("with community link", "SELECT COUNT(*) FROM collection_clusters WHERE community_link IS NOT NULL"),
             ("status = live",       "SELECT COUNT(*) FROM collection_clusters WHERE status = 'live'"),
-            ("entries total",       "SELECT COUNT(*) FROM collection_cluster_entries"),
-            ("clusters w/ entries", "SELECT COUNT(DISTINCT cluster_id) FROM collection_cluster_entries"),
             ("dup slugs (want 0)",  "SELECT COUNT(*) FROM (SELECT slug FROM collection_clusters GROUP BY slug HAVING COUNT(*) > 1) d"),
+            ("no region (review)",  "SELECT COUNT(*) FROM collection_clusters WHERE region_id IS NULL"),
         ]:
             cur.execute(q)
             print(f"{label:22}: {cur.fetchone()[0]}")
 
-        cur.execute("""
-            SELECT cc.name, cc.status, COUNT(e.id) AS entries
-            FROM collection_clusters cc
-            JOIN collection_cluster_types t ON t.id = cc.cluster_type_id AND t.slug = 'city-guide'
-            LEFT JOIN collection_cluster_entries e ON e.cluster_id = cc.id
-            GROUP BY cc.id, cc.name, cc.status ORDER BY entries DESC, cc.name
-        """)
-        print("\ncity guides (derived entries, if enabled):")
-        for name, status, n in cur.fetchall():
-            print(f"  {name:30} [{status:5}]: {n}")
-
 
 def main():
-    conn = psycopg.connect(DATABASE_URL)
-    print("connected to:", DATABASE_URL.rsplit("/", 1)[-1])
+    conn = connect()
 
     city_guides = sorted(fetch_all("/api/city-guides", {"populate": "*"}), key=lambda x: x["id"])
     print(f"fetched {len(city_guides)} city-guides")
 
-    cityguide_map, region_of = migrate_city_guides(conn, city_guides)
-
-    if DERIVE_ENTRIES:
-        derive_entries(conn, cityguide_map, region_of)
-    else:
-        print("DERIVE_ENTRIES = False — skipping geo-derived entries (hand-curation)")
-
-    out = ROOT / f"legacy_cityguide_id_map{ENV_SUFFIX}.json"
-    out.write_text(json.dumps({str(k): str(v) for k, v in cityguide_map.items()}, indent=2))
-    print(f"saved {len(cityguide_map)} legacy->new city-guide id mappings to {out}")
+    cityguide_map = migrate_city_guides(conn, city_guides)
+    save_map("legacy_cityguide_id_map", cityguide_map, "city-guide -> cluster")
 
     verify(conn)
+    preview_derived_membership(conn)
     conn.close()
 
 

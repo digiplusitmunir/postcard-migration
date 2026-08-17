@@ -1,36 +1,56 @@
-"""Directory/Album migration — legacy Strapi `directories` -> `collection_types`
-and `albums` -> `collections` OR `postcards` (tracker rows #6 and #14).
+"""Directory/Album migration — legacy `directories` -> `collection_types` and
+`albums` -> `collections` OR `postcards`.
 
 Migration step 6 of the run order (run AFTER geo, media, company and users).
 
-Scope decisions (2026-08-06, album split added 2026-08-11):
-- **Albums only become collections for collection types that have a real
-  Collection layer** (`has_dedicated_collection = true`, i.e. Properties).
-  Albums under **Restaurants / Events / Shopping** (`has_dedicated_collection
-  = false`) have no Collection to live in — they ARE the content, so they
-  migrate straight into `postcards` with `collection_id = NULL` and
-  `collection_type_id` set to their type. 667 albums in prod (Restaurants
-  341, Shopping 235, Events 91).
-- Stale `collections` rows for non-dedicated types left by earlier runs are
-  deleted after the move; the delete aborts if anything still references them.
-- **Designer Tours** directory + its 59 albums are **skipped** — they become
-  dx-card / Destination Expert data later (tracker rows #11/#13).
-- **Journey subcollections are NOT created here** (deferred). The dual-price
-  fix (`subcollections.price_starting_at`, migration
-  `20260806060000_add_subcollection_price_starting_at`) is already in the
-  schema for when that step runs.
-- author / assigned_staff circles are NOT created here — that optional step
-  lives only in `notebooks/directory_album_migration.ipynb` (section 6).
+Split rule
+----------
+Albums only become collections for collection types that have a real Collection
+layer (`has_dedicated_collection = true`, i.e. Properties). Albums under
+Restaurants / Events / Shopping have no Collection to live in — they ARE the
+content, so they migrate straight into `postcards` with `collection_id = NULL`.
+Prod: 2067 Properties albums, 673 R/E/S albums, 59 Designer Tours (skipped —
+they belong to the dx-card / Destination Expert migration), 35 with no directory.
 
-Directories are reconciled to the fixed v2 collection-type set (names/slugs
-kept, legacy description + logo url carried over). Albums map to collections
-or postcards with geo/company/media lookups by the same natural keys the
-earlier migrations used. Albums with an empty slug get one generated from the
-name, de-duplicated in-run (id-sorted so `foo-2` suffixes stay stable across
-re-runs); collection and postcard slugs are separate namespaces.
+Field mapping (verified against the live API)
+---------------------------------------------
+  name / intro / story / slug          -> same
+  coverImage                           -> cover_media_id
+  isFeatured / priority                -> is_featured / priority
+  country / region / locality          -> country_id / region_id / locality_id
+                                          (R1: no city tier, 3 FKs not 4)
+  directories (M2M)                    -> collection_type_id (single FK)
+  website / signature                  -> website / signature
+  user                                 -> owner_user_id       (R3: direct FK)
+  assignTo                             -> assigned_to_user_id (R3: direct FK)
+  galleryCollection                    -> gallery (Json)
+  seo                                  -> seo (Json)
+  sustainability                       -> about               (renamed)
+  company / companySlug                -> managed_by_company_id
+  status (else isActive)               -> status
+  lat / long / placeId / locationLink  -> location (Json component)
+  date                                 -> event_details.start_date (Events)
 
-Writes two per-environment map files (suffix from the DB name in
-DATABASE_URL) for the downstream migrations:
+The migration tracker claimed media_kit / additionalInfo / sustainability /
+status / priority / company were "not in the real v1 Album schema". They ARE —
+verified on the live API: media_kit 1461, additionalInfo 1406, sustainability
+47, status 1728, priority 2833, company 324, signature 946.
+
+Of those, `media_kit` and `additionalInfo` are DROPPED by product decision
+(2026-08-17) — the app no longer uses them, and the v2 schema has no column for
+either. `sustainability` is kept but renamed to `about`: the field holds the
+property's general "about" copy rather than a sustainability-only block.
+status / priority / company are kept and migrated as-is.
+
+Genuinely dropped (verified empty on every album): album_themes (0),
+fixedDates (0), placeId (0), locationLink (0). Archived, not migrated:
+news_article (287, editorial press links — no v2 home), on_boarding (2826,
+internal partner-onboarding workflow), bestMonth (3), avgPricePerPerson /
+pricesStartingAt / numberOfNights / numberOfGuests* / bestTimetoTravel /
+tourInfo (Journey fields that belong to property_itineraries, not Album),
+cuisines (525 — migrated instead by category_environment_facet.py).
+
+Writes two per-environment map files for the downstream migrations:
 - `legacy_album_id_map{_dev,_prod}.json`          legacy album id -> collection id
 - `legacy_album_postcard_id_map{_dev,_prod}.json` legacy album id -> postcard id
 
@@ -40,25 +60,12 @@ Usage:
     python scripts/directory_album.py
 """
 
-import json
-import os
-import re
-from pathlib import Path
+from collections import Counter
 
-import requests
-import psycopg
 from psycopg.types.json import Json
-from dotenv import load_dotenv
 
-ROOT = Path(__file__).resolve().parents[1]
-load_dotenv(ROOT / ".env")
-
-CMS_BASE_URL = os.environ["CMS_BASE_URL"].rstrip("/")
-HEADERS = {"Authorization": f"Bearer {os.environ['CMS_API_TOKEN']}"}
-DATABASE_URL = os.environ["DATABASE_URL"]
-
-# map files are suffixed per environment, keyed off the DB name in DATABASE_URL
-ENV_SUFFIX = {"development": "_dev", "production": "_prod"}.get(DATABASE_URL.rsplit("/", 1)[-1], "")
+from _common import (MediaResolver, SlugAllocator, absolute_url, attrs, connect,
+                     fetch_all, load_map, rel, rel_many, save_map, slugify)
 
 # legacy directory slug -> (name, slug, has_dedicated_collection, priority)
 # has_dedicated_collection = False means albums of this type become POSTCARDS
@@ -71,54 +78,6 @@ DIRECTORY_TO_CT = {
 SKIP_DIRECTORY_SLUGS = {"mindful-luxury-tours"}  # Designer Tours -> dx-card migration later
 
 VALID_STATUS = {"draft", "assigned", "submit", "rework", "live"}
-
-
-def slugify(text):
-    return re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-") or None
-
-
-def attrs(item):
-    """Entry fields — Strapi v4 nests them under 'attributes', v5 is flat."""
-    return item.get("attributes", item)
-
-
-def rel(obj):
-    """Unwrap a populated relation — v4: {'data': {'attributes': {...}}}, v5: flat dict."""
-    if isinstance(obj, dict) and "data" in obj:
-        obj = obj["data"]
-    if not obj:
-        return None
-    return obj.get("attributes", obj)
-
-
-def rel_many(obj):
-    """Unwrap a populated to-many relation into a list of flat dicts."""
-    if isinstance(obj, dict) and "data" in obj:
-        obj = obj["data"]
-    return [attrs(x) for x in (obj or [])]
-
-
-def fetch_all(path, params=None):
-    """Fetch every page of a Strapi collection endpoint (data/meta envelope)."""
-    items, page = [], 1
-    while True:
-        p = {"pagination[page]": page, "pagination[pageSize]": 100, "sort": "id", **(params or {})}
-        r = requests.get(f"{CMS_BASE_URL}{path}", headers=HEADERS, params=p, timeout=120)
-        r.raise_for_status()
-        body = r.json()
-        items.extend(body["data"])
-        pg = body.get("meta", {}).get("pagination", {})
-        if page >= pg.get("pageCount", 1):
-            return items
-        page += 1
-
-
-def load_prev_map(name):
-    """Previous run's map file, if any — used to keep generated slugs stable."""
-    path = ROOT / f"{name}{ENV_SUFFIX}.json"
-    if not path.exists():
-        return {}
-    return {int(k): int(v) for k, v in json.loads(path.read_text()).items()}
 
 
 def migrate_directories(conn):
@@ -142,11 +101,8 @@ def migrate_directories(conn):
                 continue
             name, slug, dedicated, priority = target
 
-            logo, icon = rel(a.get("logo")), None
-            if logo and logo.get("url"):
-                icon = logo["url"].strip()
-                if icon.startswith("/"):
-                    icon = CMS_BASE_URL + icon
+            logo = rel(a.get("logo"))
+            icon = absolute_url(logo.get("url")) if logo else None
 
             cur.execute(
                 """
@@ -196,28 +152,24 @@ def load_lookups(conn):
         locality_by_name = {}
         for n, i in cur.fetchall():
             locality_by_name.setdefault(n, []).append(i)
-        cur.execute("SELECT LOWER(name), id FROM companies")
+        cur.execute("SELECT LOWER(title), id FROM companies")
         company_by_name = dict(cur.fetchall())
         cur.execute("SELECT slug, id FROM companies")
         company_by_slug = dict(cur.fetchall())
-        cur.execute("SELECT url, id FROM media")
-        media_by_url = dict(cur.fetchall())
 
     print(f"lookups: {len(country_by_name)} countries, {len(region_by_name_country)} regions, "
-          f"{len(locality_by_name)} locality names, {len(company_by_name)} companies, "
-          f"{len(media_by_url)} media")
-    return country_by_name, region_by_name_country, locality_by_name, \
-        company_by_name, company_by_slug, media_by_url
+          f"{len(locality_by_name)} locality names, {len(company_by_name)} companies")
+    return (country_by_name, region_by_name_country, locality_by_name,
+            company_by_name, company_by_slug)
 
 
 def reserved_postcard_slugs(conn, prev_album_postcard_map):
     """Postcard slugs owned by rows this migration must NOT overwrite.
 
-    `postcards` is shared with scripts/postcard.py (legacy postcards, step 8),
-    and both upsert on slug. Every existing postcard slug is reserved except
-    the ones belonging to album-derived postcards from a previous run of THIS
-    script — those are ours to reuse, which is what keeps generated slugs
-    stable across re-runs.
+    `postcards` is shared with scripts/postcard.py (legacy postcards, step 9),
+    and both upsert on slug. Every existing postcard slug is reserved except the
+    ones belonging to album-derived postcards from a previous run of THIS
+    script — those are ours to reuse, which keeps generated slugs stable.
     """
     ours = set(prev_album_postcard_map.values())
     with conn.cursor() as cur:
@@ -228,56 +180,54 @@ def reserved_postcard_slugs(conn, prev_album_postcard_map):
     return reserved, slug_by_id
 
 
-def migrate_albums(conn, albums, dir_id_to_ct, default_ct_id, skipped_dir_ids, dedicated_ct_ids):
+def clean_json(value, drop_keys=("id",)):
+    """Strapi components carry their own `id`; strip it and empty values."""
+    if isinstance(value, dict):
+        out = {k: v for k, v in value.items() if k not in drop_keys and v not in (None, "")}
+        return out or None
+    if isinstance(value, list):
+        out = [clean_json(v, drop_keys) for v in value]
+        out = [v for v in out if v]
+        return out or None
+    return value
+
+
+def migrate_albums(conn, albums, dir_id_to_ct, default_ct_id, skipped_dir_ids,
+                   dedicated_ct_ids, user_map):
     """Album -> collections (dedicated types) or postcards (non-dedicated types).
 
     Returns ({legacy album id: collection id}, {legacy album id: postcard id}).
     """
     (country_by_name, region_by_name_country, locality_by_name,
-     company_by_name, company_by_slug, media_by_url) = load_lookups(conn)
+     company_by_name, company_by_slug) = load_lookups(conn)
+    media = MediaResolver(conn)
 
-    prev_album_postcard_map = load_prev_map("legacy_album_postcard_id_map")
+    prev_album_postcard_map = load_map("legacy_album_postcard_id_map", required=False)
     reserved_pc_slugs, pc_slug_by_id = reserved_postcard_slugs(conn, prev_album_postcard_map)
     print(f"postcard slugs reserved by non-album rows: {len(reserved_pc_slugs)} "
           f"({len(prev_album_postcard_map)} album-derived postcards from a previous run)")
 
-    def media_id_for(image, cur):
-        """Find-or-create a media row for a populated Strapi file (keyed by
-        normalized url, same as scripts/media.py — rows are reused, never duplicated)."""
-        if not image or not image.get("url"):
-            return None
-        url = image["url"].strip()
-        if url.startswith("/"):
-            url = CMS_BASE_URL + url
-        if url in media_by_url:
-            return media_by_url[url]
-        cur.execute(
-            "INSERT INTO media (url, mime_type, alt, width, height) VALUES (%s, %s, %s, %s, %s) RETURNING id",
-            (url, image.get("mime"), image.get("alternativeText") or image.get("name"),
-             image.get("width"), image.get("height")),
-        )
-        media_by_url[url] = cur.fetchone()[0]
-        return media_by_url[url]
-
     # collections.slug and postcards.slug are separate unique namespaces
-    used_collection_slugs = set()
-    used_postcard_slugs = set(reserved_pc_slugs)
-
-    def unique_slug(base, used, fallback):
-        base = base or fallback
-        slug, n = base, 2
-        while slug in used:
-            slug = f"{base}-{n}"
-            n += 1
-        used.add(slug)
-        return slug
+    coll_slugs = SlugAllocator(fallback="album")
+    pc_slugs = SlugAllocator(reserved_pc_slugs, fallback="postcard")
 
     album_to_collection = {}       # legacy album id -> new collection id
     album_to_postcard = {}         # legacy album id -> new postcard id
 
     skipped_no_name, skipped_designer_tours, no_directory = [], [], []
     missing_country, missing_region, ambiguous_locality, unmatched_company = [], [], [], []
+    multi_directory, unmapped_owner = [], set()
     dropped_on_postcard = []       # album fields with no postcards column
+    status_counts = Counter()
+
+    def user_id_for(u, album_id):
+        """Legacy user relation -> new users.id via the step-5 map (R3)."""
+        if not u:
+            return None
+        new_id = user_map.get(u["id"])
+        if not new_id:
+            unmapped_owner.add(u["id"])
+        return new_id
 
     with conn.cursor() as cur:
         for al in albums:
@@ -289,6 +239,11 @@ def migrate_albums(conn, albums, dir_id_to_ct, default_ct_id, skipped_dir_ids, d
 
             # directory -> collection_type; Designer Tours albums are NOT migrated
             dirs = rel_many(a.get("directories"))
+            if len(dirs) > 1:
+                # tracker asks for an explicit dedupe rule; prod has 0 such rows,
+                # so "lowest legacy directory id wins" is recorded, not silent
+                multi_directory.append((al["id"], name, [d["id"] for d in dirs]))
+                dirs = sorted(dirs, key=lambda d: d["id"])
             if dirs and dirs[0]["id"] in skipped_dir_ids:
                 skipped_designer_tours.append((al["id"], name))
                 continue
@@ -316,17 +271,27 @@ def migrate_albums(conn, albums, dir_id_to_ct, default_ct_id, skipped_dir_ids, d
                 else:
                     ambiguous_locality.append((al["id"], locality.get("name"), len(ids)))
 
-            cover_id = media_id_for(rel(a.get("coverImage")), cur)
+            cover_id = media.resolve(cur, rel(a.get("coverImage")))
 
+            # Location component — legacy only ever populates lat/long. The rest
+            # of the component (address, route, postal_code, google_place_id...)
+            # comes from the Gmap Address Enrichment workstream.
             location = {k: v for k, v in {
                 "lat": a.get("lat"), "lng": a.get("long"),
-                "google_place_id": a.get("placeId"), "location_link": a.get("locationLink"),
+                "google_place_id": a.get("placeId"),
             }.items() if v not in (None, "")} or None
 
+            # legacy status already uses the v2 vocabulary (live/assigned/rework/draft)
             status = a.get("status") if a.get("status") in VALID_STATUS \
                 else ("live" if a.get("isActive") else "draft")
+            status_counts[status] += 1
 
             website = (a.get("website") or "").strip() or None
+            signature = (a.get("signature") or "").strip() or None
+            seo = clean_json(a.get("seo"))
+            gallery = clean_json(a.get("galleryCollection"))
+            owner_id = user_id_for(rel(a.get("user")), al["id"])
+            assigned_id = user_id_for(rel(a.get("assignTo")), al["id"])
 
             # -------------------------------------------------------------
             # non-dedicated collection type -> the album IS a postcard
@@ -335,48 +300,44 @@ def migrate_albums(conn, albums, dir_id_to_ct, default_ct_id, skipped_dir_ids, d
                 base = (a.get("slug") or "").strip() or slugify(name)
                 # reuse the slug this album already owns, so re-runs don't drift
                 prev_slug = pc_slug_by_id.get(prev_album_postcard_map.get(al["id"]))
-                if prev_slug:
-                    slug = prev_slug
-                    used_postcard_slugs.add(slug)
-                else:
-                    slug = unique_slug(base, used_postcard_slugs, "postcard")
+                slug = pc_slugs.keep(prev_slug) if prev_slug else pc_slugs.take(base)
 
                 # Events: legacy `date` is the single event day (91/91 in prod)
                 event_date = a.get("date")
                 event_date = event_date.strip() if isinstance(event_date, str) else event_date
                 event_details = {"start_date": event_date} if event_date else None
 
-                # album fields with no home on postcards -> report, don't lose silently
-                orphaned = {k: a.get(k) for k in
-                            ("media_kit", "additionalInfo", "sustainability", "seo", "companySlug")
-                            if a.get(k) not in (None, "", [], {})}
-                nd_company = rel(a.get("company"))
-                if nd_company:
-                    orphaned["company"] = nd_company.get("name")
-                if orphaned:
-                    dropped_on_postcard.append((al["id"], name, sorted(orphaned)))
+                # `about` is collection-only (0 non-dedicated albums carry a
+                # sustainability value, but report rather than lose silently).
+                # media_kit / additionalInfo are dropped platform-wide by
+                # product decision, so they are not reported as orphans here.
+                if (a.get("sustainability") or "").strip():
+                    dropped_on_postcard.append((al["id"], name, "sustainability/about"))
 
                 cur.execute(
                     """
                     INSERT INTO postcards
                         (name, intro, slug, story, collection_type_id, collection_id,
-                         country_id, region_id, city_id, locality_id, location,
-                         event_details, website, is_featured, priority, cover_media_id,
-                         status, published_at)
-                    VALUES (%s, %s, %s, %s, %s, NULL, %s, %s, NULL, %s, %s, %s, %s,
-                            %s, %s, %s, %s, %s)
+                         user_id, country_id, region_id, locality_id, location, seo,
+                         event_details, website, signature, is_featured, priority,
+                         cover_media_id, status, published_at)
+                    VALUES (%s, %s, %s, %s, %s, NULL, %s, %s, %s, %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (slug) DO UPDATE
                     SET name = EXCLUDED.name,
                         intro = EXCLUDED.intro,
                         story = EXCLUDED.story,
                         collection_type_id = EXCLUDED.collection_type_id,
                         collection_id = NULL,
+                        user_id = EXCLUDED.user_id,
                         country_id = EXCLUDED.country_id,
                         region_id = EXCLUDED.region_id,
                         locality_id = EXCLUDED.locality_id,
                         location = EXCLUDED.location,
+                        seo = EXCLUDED.seo,
                         event_details = EXCLUDED.event_details,
                         website = EXCLUDED.website,
+                        signature = EXCLUDED.signature,
                         is_featured = EXCLUDED.is_featured,
                         priority = EXCLUDED.priority,
                         cover_media_id = EXCLUDED.cover_media_id,
@@ -389,10 +350,12 @@ def migrate_albums(conn, albums, dir_id_to_ct, default_ct_id, skipped_dir_ids, d
                      slug,
                      (a.get("story") or "").strip() or None,
                      ct_id,
+                     owner_id,
                      country_id, region_id, locality_id,
                      Json(location) if location else None,
+                     Json(seo) if seo else None,
                      Json(event_details) if event_details else None,
-                     website,
+                     website, signature,
                      bool(a.get("isFeatured")), a.get("priority") or 0,
                      cover_id, status,
                      a.get("createdAt") if status == "live" else None),
@@ -403,8 +366,7 @@ def migrate_albums(conn, albums, dir_id_to_ct, default_ct_id, skipped_dir_ids, d
             # -------------------------------------------------------------
             # dedicated collection type -> collection (Properties)
             # -------------------------------------------------------------
-            slug = unique_slug((a.get("slug") or "").strip() or slugify(name),
-                               used_collection_slugs, "album")
+            slug = coll_slugs.take((a.get("slug") or "").strip() or slugify(name))
 
             # company relation by name, else legacy companySlug string by slug
             company, company_id = rel(a.get("company")), None
@@ -418,17 +380,15 @@ def migrate_albums(conn, albums, dir_id_to_ct, default_ct_id, skipped_dir_ids, d
                 if not company_id:
                     unmatched_company.append((al["id"], cs))
 
-            seo = {k: v for k, v in (a.get("seo") or {}).items()
-                   if k != "id" and v not in (None, "")} or None
-
             cur.execute(
                 """
                 INSERT INTO collections
                     (collection_type_id, name, intro, story, slug, cover_media_id, seo,
-                     is_featured, priority, country_id, region_id, locality_id, location,
-                     managed_by_company_id, website, media_kit, additional_info,
-                     sustainability, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     gallery, is_featured, priority, country_id, region_id, locality_id,
+                     location, managed_by_company_id, owner_user_id, assigned_to_user_id,
+                     website, signature, about, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s)
                 ON CONFLICT (slug) DO UPDATE
                 SET collection_type_id = EXCLUDED.collection_type_id,
                     name = EXCLUDED.name,
@@ -436,6 +396,7 @@ def migrate_albums(conn, albums, dir_id_to_ct, default_ct_id, skipped_dir_ids, d
                     story = EXCLUDED.story,
                     cover_media_id = EXCLUDED.cover_media_id,
                     seo = EXCLUDED.seo,
+                    gallery = EXCLUDED.gallery,
                     is_featured = EXCLUDED.is_featured,
                     priority = EXCLUDED.priority,
                     country_id = EXCLUDED.country_id,
@@ -443,24 +404,25 @@ def migrate_albums(conn, albums, dir_id_to_ct, default_ct_id, skipped_dir_ids, d
                     locality_id = EXCLUDED.locality_id,
                     location = EXCLUDED.location,
                     managed_by_company_id = EXCLUDED.managed_by_company_id,
+                    owner_user_id = EXCLUDED.owner_user_id,
+                    assigned_to_user_id = EXCLUDED.assigned_to_user_id,
                     website = EXCLUDED.website,
-                    media_kit = EXCLUDED.media_kit,
-                    additional_info = EXCLUDED.additional_info,
-                    sustainability = EXCLUDED.sustainability,
+                    signature = EXCLUDED.signature,
+                    about = EXCLUDED.about,
                     status = EXCLUDED.status
                 RETURNING id
                 """,
                 (ct_id, name,
                  (a.get("intro") or "").strip() or None,
                  (a.get("story") or "").strip() or None,
-                 slug, cover_id, Json(seo) if seo else None,
+                 slug, cover_id,
+                 Json(seo) if seo else None,
+                 Json(gallery) if gallery else None,
                  bool(a.get("isFeatured")), a.get("priority") or 0,
                  country_id, region_id, locality_id,
                  Json(location) if location else None,
-                 company_id,
-                 website,
-                 (a.get("media_kit") or "").strip() or None,
-                 (a.get("additionalInfo") or "").strip() or None,
+                 company_id, owner_id, assigned_id,
+                 website, signature,
                  (a.get("sustainability") or "").strip() or None,
                  status),
             )
@@ -469,13 +431,17 @@ def migrate_albums(conn, albums, dir_id_to_ct, default_ct_id, skipped_dir_ids, d
     conn.commit()
     print(f"collections upserted (dedicated types): {len(album_to_collection)}")
     print(f"postcards upserted (non-dedicated types): {len(album_to_postcard)}")
+    print(f"status distribution: {dict(status_counts)}")
     print(f"skipped Designer Tours albums ({len(skipped_designer_tours)})")  # expect 59
     print(f"skipped (no name): {skipped_no_name}")
-    print(f"no directory -> defaulted to Properties ({len(no_directory)}): {no_directory}")
+    print(f"media rows created by this step: {media.created}")
+    print(f"no directory -> defaulted to Properties ({len(no_directory)})")
+    print(f"MANUAL REVIEW multi-directory albums, lowest id wins ({len(multi_directory)}): {multi_directory[:20]}")
     print(f"MANUAL REVIEW country not found ({len(missing_country)}): {missing_country[:20]}")
     print(f"MANUAL REVIEW region not found ({len(missing_region)}): {missing_region[:20]}")
     print(f"MANUAL REVIEW locality missing/ambiguous ({len(ambiguous_locality)}): {ambiguous_locality[:20]}")
     print(f"MANUAL REVIEW company unmatched ({len(unmatched_company)}): {unmatched_company[:20]}")
+    print(f"MANUAL REVIEW legacy user/assignTo not in user map ({len(unmapped_owner)}): {sorted(unmapped_owner)[:20]}")
     print(f"MANUAL REVIEW album fields with no postcards column, dropped "
           f"({len(dropped_on_postcard)}): {dropped_on_postcard[:20]}")
     return album_to_collection, album_to_postcard
@@ -513,23 +479,22 @@ def drop_stale_nondedicated_collections(conn):
              "  JOIN collections c ON c.id = s.collection_id\n"
              "  JOIN collection_types ct ON ct.id = c.collection_type_id\n"
              " WHERE ct.has_dedicated_collection = false;"),
+            ("memories",
+             "SELECT COUNT(*) FROM memories WHERE collection_id = ANY(%s)",
+             "-- re-point the memory at the album-derived postcard, or detach\n"
+             "UPDATE memories m SET collection_id = NULL\n"
+             "  FROM collections c JOIN collection_types ct ON ct.id = c.collection_type_id\n"
+             " WHERE m.collection_id = c.id AND ct.has_dedicated_collection = false;"),
             ("facet_assignments",
              "SELECT COUNT(*) FROM facet_assignments WHERE owned_type = 'collection' AND owned_id = ANY(%s)",
              "-- facet assignments are re-created by the facet migrations\n"
              "DELETE FROM facet_assignments fa USING collections c, collection_types ct\n"
              " WHERE fa.owned_type = 'collection' AND fa.owned_id = c.id\n"
              "   AND ct.id = c.collection_type_id AND ct.has_dedicated_collection = false;"),
-            ("collection_cluster_entries",
-             "SELECT COUNT(*) FROM collection_cluster_entries WHERE entry_type = 'collection' AND entry_id = ANY(%s)",
-             "-- geo-derived city-guide entries; cityguide.py re-derives them as\n"
-             "-- entry_type = 'postcard' on its next run\n"
-             "DELETE FROM collection_cluster_entries e USING collections c, collection_types ct\n"
-             " WHERE e.entry_type = 'collection' AND e.entry_id = c.id\n"
-             "   AND ct.id = c.collection_type_id AND ct.has_dedicated_collection = false;"),
             ("circles",
              "SELECT COUNT(*) FROM circles WHERE owned_type = 'collection' AND owned_id = ANY(%s)",
-             "-- author/owner circles: re-point at the album-derived postcard by hand,\n"
-             "-- or delete and re-run the optional circles notebook section\n"
+             "-- follow-album circles: re-point at the album-derived postcard by hand,\n"
+             "-- or delete and re-run scripts/follows.py\n"
              "DELETE FROM circles ci USING collections c, collection_types ct\n"
              " WHERE ci.owned_type = 'collection' AND ci.owned_id = c.id\n"
              "   AND ct.id = c.collection_type_id AND ct.has_dedicated_collection = false;"),
@@ -584,11 +549,17 @@ def verify(conn):
             ("with cover media",   "SELECT COUNT(*) FROM collections WHERE cover_media_id IS NOT NULL"),
             ("with country",       "SELECT COUNT(*) FROM collections WHERE country_id IS NOT NULL"),
             ("with region",        "SELECT COUNT(*) FROM collections WHERE region_id IS NOT NULL"),
+            ("with locality",      "SELECT COUNT(*) FROM collections WHERE locality_id IS NOT NULL"),
             ("with company",       "SELECT COUNT(*) FROM collections WHERE managed_by_company_id IS NOT NULL"),
+            ("with owner",         "SELECT COUNT(*) FROM collections WHERE owner_user_id IS NOT NULL"),
+            ("with assignee",      "SELECT COUNT(*) FROM collections WHERE assigned_to_user_id IS NOT NULL"),
+            ("with signature",     "SELECT COUNT(*) FROM collections WHERE signature IS NOT NULL"),
+            ("with about",         "SELECT COUNT(*) FROM collections WHERE about IS NOT NULL"),
             ("status = live",      "SELECT COUNT(*) FROM collections WHERE status = 'live'"),
             ("dup slugs (want 0)", "SELECT COUNT(*) FROM (SELECT slug FROM collections GROUP BY slug HAVING COUNT(*) > 1) d"),
             ("postcards total",    "SELECT COUNT(*) FROM postcards"),
             ("pc w/ website",      "SELECT COUNT(*) FROM postcards WHERE website IS NOT NULL"),
+            ("pc w/ signature",    "SELECT COUNT(*) FROM postcards WHERE signature IS NOT NULL"),
             ("pc w/ event_details", "SELECT COUNT(*) FROM postcards WHERE event_details IS NOT NULL"),
             ("pc w/ location",     "SELECT COUNT(*) FROM postcards WHERE location IS NOT NULL"),
             ("bad: nonded w/ coll", """
@@ -596,12 +567,14 @@ def verify(conn):
                 WHERE ct.has_dedicated_collection = false AND p.collection_id IS NOT NULL"""),
         ]:
             cur.execute(q)
-            print(f"{label:20}: {cur.fetchone()[0]}")
+            print(f"{label:22}: {cur.fetchone()[0]}")
 
 
 def main():
-    conn = psycopg.connect(DATABASE_URL)
-    print("connected to:", DATABASE_URL.rsplit("/", 1)[-1])
+    conn = connect()
+
+    user_map = load_map("legacy_user_id_map")
+    print(f"loaded {len(user_map)} user mappings (for owner/assignTo, R3)")
 
     dir_id_to_ct, default_ct_id, skipped_dir_ids, dedicated_ct_ids = migrate_directories(conn)
 
@@ -609,18 +582,12 @@ def main():
     print(f"fetched {len(albums)} albums")
 
     album_to_collection, album_to_postcard = migrate_albums(
-        conn, albums, dir_id_to_ct, default_ct_id, skipped_dir_ids, dedicated_ct_ids)
+        conn, albums, dir_id_to_ct, default_ct_id, skipped_dir_ids, dedicated_ct_ids, user_map)
 
-    for fname, mapping, label in [
-        ("legacy_album_id_map", album_to_collection, "album -> collection"),
-        ("legacy_album_postcard_id_map", album_to_postcard, "album -> postcard"),
-    ]:
-        out = ROOT / f"{fname}{ENV_SUFFIX}.json"
-        out.write_text(json.dumps({str(k): str(v) for k, v in mapping.items()}, indent=2))
-        print(f"saved {len(mapping)} {label} mappings to {out}")
+    save_map("legacy_album_id_map", album_to_collection, "album -> collection")
+    save_map("legacy_album_postcard_id_map", album_to_postcard, "album -> postcard")
 
     drop_stale_nondedicated_collections(conn)
-
     verify(conn)
     conn.close()
 

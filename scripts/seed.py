@@ -7,11 +7,12 @@ the platform grows.
 
   collection_types          Properties, Restaurants, Events, ...
   subcollection_types       Journey (under Properties)
-  collection_cluster_types  City Guide
-  cluster_type_collection_types
-                            City Guide -> Restaurants, Events, Shopping
-  tags                      sample postcard-level feature tags
-  response_types            contact_form, feedback, newsletter_signup
+  collection_cluster_types  City Guide (+ collection_type_ids: which collection
+                            types it clusters — Restaurants, Events, Shopping;
+                            + match_field: the column that binds content to a
+                            cluster instance — region_id for City Guide)
+  tags                      curated persona-interest tags (samples)
+  response_types            contact_form
   response_fields           field definitions per response type
 
 Idempotent: everything upserts on its natural key (slug / field name), so it
@@ -48,20 +49,20 @@ SUBCOLLECTION_TYPES = [
     ("properties", "Journey", "journey", 1),
 ]
 
-# name, slug, priority
+# name, slug, priority, collection_type_slugs, match_field
+#
+# A cluster type declares BOTH halves of its derivation rule:
+#   collection_type_slugs -> collection_cluster_types.collection_type_ids:
+#       which collection types are eligible, in display order.
+#   match_field: which column on collections/postcards matches content to a
+#       specific cluster instance.
+# Rendering a cluster page is a query, not a stored join:
+#   WHERE collection_type_id = ANY(collection_type_ids)
+#     AND <match_field> = <the cluster row's own value for that field>
+# There is deliberately no collection_cluster_entries table (tracker
+# 2026-08-12: cluster membership is fully derived, never curated).
 COLLECTION_CLUSTER_TYPES = [
-    ("City Guide",          "city-guide",          1),
-]
-
-# Which collection types each cluster type is a cluster OF — a City Guide
-# groups the geo-direct content of a city: Restaurants, Events and Shopping.
-# This drives the geo-derived entries in scripts/cityguide.py, so a collection
-# type left out here is never pulled into a cluster of that kind.
-# cluster_type_slug, collection_type_slug, priority (order within the cluster)
-CLUSTER_TYPE_COLLECTION_TYPES = [
-    ("city-guide", "restaurants", 1),
-    ("city-guide", "events",      2),
-    ("city-guide", "shopping",    3),
+    ("City Guide", "city-guide", 1, ["restaurants", "events", "shopping"], "region_id"),
 ]
 
 # NOTE: user_types are NOT seeded here — they are migrated from the legacy CMS
@@ -72,10 +73,12 @@ CLUSTER_TYPE_COLLECTION_TYPES = [
 # -----------------------------------------------------------------------------
 
 # NOTE: facet_types / facet_values are NOT seeded here — they are migrated from
-# the legacy CMS: Tag -> 'Experience' (notebooks/tags_facet_migration.ipynb);
-# Category / Environment / Tag-group facets follow in their own tracker rows.
+# the legacy CMS: Tag -> 'Experience' (scripts/tags_facet.py); Category and
+# Environment -> per-collection-type facets (scripts/category_environment_facet.py).
 
-# name, slug — granular postcard-level feature tags (samples)
+# name, slug — curated interest vocabulary for the persona engine
+# (user_persona_tags). Legacy content tags do NOT go here; they migrate to
+# facet_values under FacetType 'Experience'.
 TAGS = [
     ("Stargazing",    "stargazing"),
     ("Infinity Pool", "infinity-pool"),
@@ -137,36 +140,36 @@ def main() -> None:
             )
         print(f"subcollection_types       : {len(SUBCOLLECTION_TYPES)} upserted")
 
-        for name, slug, priority in COLLECTION_CLUSTER_TYPES:
+        for name, slug, priority, ct_slugs, match_field in COLLECTION_CLUSTER_TYPES:
+            # collection_type_ids resolved from slugs, list order preserved by
+            # WITH ORDINALITY (the array order is the display order)
             cur.execute(
                 """
-                INSERT INTO collection_cluster_types (name, slug, priority)
-                VALUES (%s, %s, %s)
+                INSERT INTO collection_cluster_types
+                    (name, slug, priority, collection_type_ids, match_field)
+                SELECT %s, %s, %s, ARRAY(
+                    SELECT ct.id
+                    FROM unnest(%s::text[]) WITH ORDINALITY AS s(slug, ord)
+                    JOIN collection_types ct ON ct.slug = s.slug
+                    ORDER BY s.ord
+                ), %s
                 ON CONFLICT (slug) DO UPDATE
                 SET name = EXCLUDED.name,
-                    priority = EXCLUDED.priority
+                    priority = EXCLUDED.priority,
+                    collection_type_ids = EXCLUDED.collection_type_ids,
+                    match_field = EXCLUDED.match_field
+                RETURNING collection_type_ids
                 """,
-                (name, slug, priority),
+                (name, slug, priority, ct_slugs, match_field),
             )
-        print(f"collection_cluster_types  : {len(COLLECTION_CLUSTER_TYPES)} upserted")
-
-        for cluster_slug, ct_slug, priority in CLUSTER_TYPE_COLLECTION_TYPES:
-            cur.execute(
-                """
-                INSERT INTO cluster_type_collection_types
-                    (cluster_type_id, collection_type_id, priority)
-                SELECT cct.id, ct.id, %s
-                FROM collection_cluster_types cct, collection_types ct
-                WHERE cct.slug = %s AND ct.slug = %s
-                ON CONFLICT (cluster_type_id, collection_type_id) DO UPDATE
-                SET priority = EXCLUDED.priority
-                """,
-                (priority, cluster_slug, ct_slug),
-            )
-            if cur.rowcount != 1:
-                sys.exit(f"seed failed: cluster type '{cluster_slug}' or collection type "
-                         f"'{ct_slug}' does not exist")
-        print(f"cluster_type_collection_types: {len(CLUSTER_TYPE_COLLECTION_TYPES)} upserted")
+            resolved = cur.fetchone()[0]
+            if len(resolved) != len(ct_slugs):
+                sys.exit(f"seed failed: cluster type '{slug}' lists {len(ct_slugs)} collection "
+                         f"type slugs {ct_slugs} but only {len(resolved)} resolved — check for "
+                         f"a typo against COLLECTION_TYPES")
+        print(f"collection_cluster_types  : {len(COLLECTION_CLUSTER_TYPES)} upserted "
+              + ", ".join(f"({slug} clusters {len(cts)} types, match on {mf})"
+                          for _, slug, _, cts, mf in COLLECTION_CLUSTER_TYPES))
 
         for name, slug in TAGS:
             cur.execute(

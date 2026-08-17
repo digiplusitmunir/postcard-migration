@@ -32,6 +32,12 @@ to the new **PostgreSQL + Prisma** stack.
 | 1 | [Geo Migration](migrations/geo-migration.md) | `notebooks/geo_migration.ipynb` |
 | 2 | [User Migration](migrations/user-migration.md) | `notebooks/user_migration.ipynb` |
 
+### Schema Change Plan — v2 schema vs. the Field-Mapping Tracker
+
+| Document | What it covers |
+|---|---|
+| [Schema Change Plan](schema-change-plan/index.md) | Per-table plan for reconciling `schema.prisma` and every migration script with `Postcard_Migration_Tracker(Field Mapping).csv` — what to remove, rename, add, and which decisions are still open |
+
 ## The developer loop
 
 ```text

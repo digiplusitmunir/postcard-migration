@@ -81,12 +81,15 @@ Migrations depend on each other's data. Always run them in this order:
 
 9. City Guide      scripts/cityguide.py  (or notebooks/cityguide_migration.ipynb)
                         city_guides → collection_clusters (City Guide type) +
-                        geo-derived collection_cluster_entries for live
-                        collections AND live collection-less postcards in the
-                        region — legacy region maps to the v2 CITIES tier
-                        (cities were synthesized 1:1 from regions); needs
-                        schema migration 20260810080000 (cover +
-                        community_link columns);
+                        geo-derived collection_cluster_entries SCOPED by
+                        collection_cluster_types.collection_type_ids — City
+                        Guide clusters Restaurants/Events/Shopping, so entries
+                        are their postcards; Properties is out of scope. Legacy
+                        region maps to the v2 CITIES tier (cities were
+                        synthesized 1:1 from regions); needs schema migrations
+                        20260810080000 (cover + community_link) and
+                        20260811090000 (collection_type_ids), and seed.py for
+                        the scope array;
                         writes legacy_cityguide_id_map for follows (#24)
 
 10. Bookmark       scripts/bookmark.py  (or notebooks/bookmark_migration.ipynb)
@@ -112,7 +115,7 @@ Migrations depend on each other's data. Always run them in this order:
 | 6 | Tags facet | seed only | [Tags Facet Migration](tags-facet-migration.md) | [tags_facet_migration.ipynb](notebooks/tags_facet_migration.ipynb) |
 | 7 | Postcard | **5**, **6** (map files) | [Postcard Migration](postcard-migration.md) | [postcard_migration.ipynb](notebooks/postcard_migration.ipynb) |
 | 8 | Journey | **5**, **7** (map files) | [Journey Migration](journey-migration.md) | [journey_migration.ipynb](notebooks/journey_migration.ipynb) |
-| 9 | City Guide | **1**, **2**, **5**, seed | [City Guide Migration](cityguide-migration.md) | [cityguide_migration.ipynb](notebooks/cityguide_migration.ipynb) |
+| 9 | City Guide | **1**, **2**, **5**, seed, schema `20260811090000` | [City Guide Migration](cityguide-migration.md) | [cityguide_migration.ipynb](notebooks/cityguide_migration.ipynb) |
 | 10 | Bookmark | **4**, **7** (map files) | [Bookmark Migration](bookmark-migration.md) | [bookmark_migration.ipynb](notebooks/bookmark_migration.ipynb) |
 
 The **Notebook (rendered)** column shows the live notebook — every markdown and

@@ -66,6 +66,23 @@ nav:
       - "City Guide — Notebook": migrations/notebooks/cityguide_migration.ipynb
       - 10. Bookmark Migration: migrations/bookmark-migration.md
       - "Bookmark — Notebook": migrations/notebooks/bookmark_migration.ipynb
+  - Schema Change Plan:
+      - schema-change-plan/index.md
+      - "Implementation Report & Runbook": schema-change-plan/implementation.md
+      - 00. Cross-cutting Changes: schema-change-plan/00-cross-cutting.md
+      - 01. Seed Types: schema-change-plan/01-seed-types.md
+      - 02. Geo: schema-change-plan/02-geo.md
+      - 03. Media: schema-change-plan/03-media.md
+      - 04. Company: schema-change-plan/04-company.md
+      - 05. Users: schema-change-plan/05-users.md
+      - 06. Directory & Album: schema-change-plan/06-directory-album.md
+      - 07. Tags Facet: schema-change-plan/07-tags-facet.md
+      - 08. Postcard: schema-change-plan/08-postcard.md
+      - 09. Journey: schema-change-plan/09-journey.md
+      - 10. City Guide: schema-change-plan/10-cityguide.md
+      - 11. Bookmark: schema-change-plan/11-bookmark.md
+      - "12. Category & Environment Facet — NEW": schema-change-plan/12-category-environment-facet.md
+      - 13. Not Yet Scripted: schema-change-plan/13-not-yet-scripted.md
 
 markdown_extensions:
   - admonition

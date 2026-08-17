@@ -1,0 +1,265 @@
+Field-Level Mapping — Core Active Tables (order matches Migration Tracker),,,
+"Baseline: 'Postcard Travel Club - Domain Model - Diagrams & Explanations' (9 Jul 2026 Google Doc, confirmed authoritative 2026-08-05). Purple rows = confirmed extensions beyond that doc. GEO CHANGE 2026-08-05: City tier REMOVED - 3-tier Country/Region/Locality, disambiguated via Locality.google_place_id; City Guide re-anchors to Region. MEMBERSHIP CHANGE 2026-08-12: Free/StarLife tier moved out of User into its own Membership table. OWNERSHIP CHANGE 2026-08-12: Circle is reserved for follow/bookmark engagement only - ownership/assignment (user/assignTo) fields are direct FKs, not Circle. CIRCLE CONSOLIDATION 2026-08-12: Bookmark + all 6 Follow-* tables collapse into ONE relationship='bookmark' value, differentiated only by owned_type.",,,
+,,,
+Country,-> Country,,
+v1 Field,v2 Field / Target,Disposition,Note
+name,name,Direct,"Matches canonical doc (id, name, slug)."
+slug,slug,Direct,Matches canonical doc.
+code,code,Direct,"EXTENSION beyond canonical doc (2026-08-05, confirmed intentional)."
+continent,continent (enum),Transform,EXTENSION beyond canonical doc (confirmed intentional). Enum value list still needs to be defined.
+coverImage,flag (image),Transform,EXTENSION beyond canonical doc (confirmed intentional). ASSUMPTION: mapped from v1's coverImage field.
+otherNames,(no target field),Flag,Not included in the confirmed field list - still unmapped/archived if needed.
+,,,
+Tag,-> FacetType 'Experience' + FacetAssignment (owned_type=postcard),,
+v1 Field,v2 Field / Target,Disposition,Note
+name,FacetValue.name (under FacetType='Experience'),Transform,"EXTENSION beyond canonical doc (confirmed intentional, 2026-08-05)."
+tag_group,"FacetType (if grouped), else default 'Experience' FacetType",Transform,Matches the Tag-group decision - per-group call.
+(scope),FacetAssignment (owned_type=postcard),Transform,"Confirmed 2026-08-05: owned by Postcard, not Collection directly."
+(resolved),"Property/Collection tag filter -> via rollup, no direct assignment",Transform,"CONFIRMED 2026-08-05: Property rolls up from child Postcards, same pattern flat_properties uses. Differs from Theme, which IS assigned directly on Collection."
+,,,
+User-type,-> UserType,,
+v1 Field,v2 Field / Target,Disposition,Note
+name,title,Transform,EXTENSION beyond canonical doc (confirmed intentional) - canonical schema calls this 'name'.
+slug,slug,Direct,Matches canonical doc field name.
+(relation),UserRole.user_type_id (User <-> UserType join),Direct,Matches canonical doc.
+isDefault / isCreator / isAdmin,(dropped),Flag,DEVIATION beyond canonical doc (confirmed intentional) - canonical schema keeps these as real fields.
+,,,
+Company,-> Company,,
+v1 Field,v2 Field / Target,Disposition,Note
+name,title,Transform,EXTENSION beyond canonical doc (confirmed intentional) - canonical schema calls this 'name'.
+logo,logo (image),Direct,EXTENSION beyond canonical doc (confirmed intentional).
+coverImage,coverImage (image),Direct,EXTENSION beyond canonical doc (confirmed intentional). Distinct from logo.
+(relation),UserRole (user_id + company_id),Direct,Matches canonical doc.
+"(relation, inverse)",Collection.managed_by_company_id,Direct,Matches canonical doc exactly. NOTE 2026-08-12: not present in the real Album schema Angel pasted - confirm this relation lives elsewhere (e.g. on the User/Company side) or is genuinely dropped for Album specifically.
+,,,
+Upload - File,"-> Media (confirmed 2026-08-05: exact match, no field changes)",,
+v1 Field,v2 Field / Target,Disposition,Note
+name / alternativeText / caption,(equivalent fields),Direct,
+url / formats / hash / ext / mime / size / provider,(equivalent fields),Direct,Preserve S3/CDN URL and provider metadata as-is.
+id (numeric),id (UUID),Transform,Build and retain a permanent old-numeric-ID -> new-UUID mapping table.
+,,,
+Directory,-> CollectionType,,
+v1 Field,v2 Field / Target,Disposition,Note
+name,name,Direct,Matches canonical doc: Properties/Restaurants/Events/Shopping/Destination Expert.
+slug,slug,Direct,ASSUMPTION: v1 field name assumed 'slug'.
+(new),description,Flag,In canonical schema but no known v1 source field.
+(new),icon,Flag,In canonical schema but no known v1 source field.
+(new),has_dedicated_collection (boolean),Transform,Derived business rule: true only for Properties and Destination Expert.
+(new),priority (integer),Flag,In canonical schema but no known v1 source field.
+,,,
+Category,-> FacetType (scoped per CollectionType) / FacetValue / FacetAssignment,,
+v1 Field,v2 Field / Target,Disposition,Note
+name,FacetValue.name,Direct,"The actual category value (e.g. 'Boutique Stay', 'Indian', 'Adventure')."
+slug,FacetValue.slug,Direct,
+directory,FacetType.applies_to_collection_type_id + FacetType.name,Transform,"CONFIRMED 2026-08-05: Properties -> 'Type', Restaurants -> 'Cuisine/Type', Journeys (Subcollection) -> 'Theme', Events -> 'Category', Shopping -> 'Type'."
+(assignment level),FacetAssignment: owned_type=collection for Properties/Destination Expert; owned_type=postcard for Restaurants/Events/Shopping,Transform,CONFIRMED 2026-08-05 (Option A). RECONFIRMED 2026-08-12: still required on Collection even though trimmed out of the real Album schema paste - relation lives on the Category/FacetValue side.
+,,,
+Environment,"-> FacetType (scoped per CollectionType, name TBD) / FacetValue / FacetAssignment",,
+v1 Field,v2 Field / Target,Disposition,Note
+name,FacetValue.name,Direct,"The actual value (e.g. 'Beachfront', 'Mountain', 'Urban')."
+(nomenclature),"FacetType.name - per CollectionType, TBD",Transform,CLARIFIED 2026-08-05: same family as Category's Type/Cuisine-Type/Theme/Category nomenclature - names TBD.
+(assignment level),FacetAssignment: owned_type=collection for Properties/Destination Expert; owned_type=postcard for Restaurants/Events/Shopping,Transform,Same binding rule as Category.
+,,,
+(cross-cutting) Location Component,"-> embedded on Collection, Postcard, CollectionCluster (REVISED 2026-08-05: City dropped)",,
+v1 Field,v2 Field / Target,Disposition,Note
+formatted_address,location.address,Direct,Google's full formatted address string - kept as-is for display.
+(new) street_number,location.street_number,Transform,Accommodates Google Geocoding API's address_components breakdown.
+(new) route,location.route,Transform,Street name.
+(new) subpremise,location.subpremise (optional),Transform,"Unit/apartment/suite number, when Google returns one."
+(new) postal_code,location.postal_code,Transform,From Google's address_components.
+(new) administrative_area_level_2,location.admin_area_level_2 (optional),Transform,"County/district, if Google returns one - stored for reference, not a geo-hierarchy tier."
+administrative_area_level_1,-> Region.name,Direct,Google's state/province level maps directly to Region.
+locality,"location.city_name (free-text, NOT a foreign-keyed tier)",Transform,"REVISED 2026-08-05: Google's city-level 'locality' term is stored as a plain descriptive string on the location component only - since City is no longer a tier, this is informational display text, not a relation to any table."
+sublocality / neighborhood,-> Locality.name,Direct,"Maps directly to our Locality entity, now parented by Region (City tier removed)."
+country,-> Country.name,Direct,Maps to our Country tier.
+lat / lng,location.lat / location.lng,Direct,Confirmed 2026-08-12: no v1 source field for these on Album - purely derived by geocoding the country/region/locality relations that DO exist in v1.
+place_id,location.google_place_id,Direct,"Same as above - Gmap-derived, no v1 source field. Building/address-level place_id - distinct from Locality's own neighborhood-level place_id."
+,,,
+(cross-cutting) Stay Details Component,"-> reusable component - attach to Subcollection (Journey), and elsewhere as needed",,
+v1 Field,v2 Field / Target,Disposition,Note
+numberOfDays,stayDetails.number_of_days,Direct,From Property-itinerary's real schema.
+numberOfNights,stayDetails.number_of_nights,Direct,From Property-itinerary's real schema - matches the number_of_nights name already assumed elsewhere.
+price,stayDetails.price,Direct,SINGLE price field in the real v1 schema.
+priceType,stayDetails.price_type (enum: per_person / twin_sharing),Transform,"CORRECTION 2026-08-12: real v1 pattern is ONE price field + a priceType enum ('per person'/'twin sharing') - NOT two separate price columns as the earlier (incorrect, pre-real-schema) Album draft assumed. CONFIRMED: the '2nd price' display value is CALCULATED via a formula off the stored price at read/display time - no separate v1 data needed for it."
+best_time_to_visits,stayDetails.best_months (via Month relation),Transform,"oneToMany relation to a Month entity, not an embedded array - iterate the relation to populate best_months."
+(new),stayDetails.number_of_rooms,Transform,"CONFIRMED 2026-08-12: new component field, no v1 source - same treatment as guests_per_room below."
+(new),stayDetails.guests_per_room,Transform,"CONFIRMED 2026-08-12: new component field, no v1 source. Angel's original ask ('number of persons per room') lives here going forward, alongside price/rooms - not migrated from any v1 data."
+,,,
+Region,-> Region,,
+v1 Field,v2 Field / Target,Disposition,Note
+name / slug,name / slug,Direct,"Matches canonical doc. Enforce Unique(name, country_id) on load - dedupe first."
+country,country_id,Direct,
+,,,
+Users-Permissions-Role,-> (feeds UserType classification only),,
+NEEDS SOURCE SCHEMA,"Not migrated as its own table - lookup only, used in the Users-Permissions-User step.",,
+,,,
+Destination-expert,-> Collection (Destination Expert),,
+v1 Field,v2 Field / Target,Disposition,Note
+name / title / tagLine,name / intro,Transform,"CONFIRMED 2026-08-12: tagLine folds into intro, no separate field - archived as-is."
+coverImage,cover_media_id,Direct,
+country / region,country_id / region_id,Direct,
+status,status,Transform,v1 only has draft/published - map onto the canonical 5-value Collection.status set.
+quotes / founderMessage / dxSections,(no structured target),Archived,"CONFIRMED 2026-08-12: archived as-is, no structured target - not migrated."
+,,,
+Users-Permissions-User,-> User + UserRole (kept lean - no unnecessary relations),,
+v1 Field,v2 Field / Target,Disposition,Note
+username / email,username / email,Direct,Matches canonical User schema.
+provider / (password),auth_provider / provider_id / password_hash,Transform,SECURITY: do not carry forward the shared hardcoded social-login password hash - issue fresh hashes/reset flow.
+confirmed / blocked,email_verified / is_blocked,Direct,
+role,UserRole.user_type_id,Transform,CONFIRMED 2026-08-12: simplified to just the UserType assignment - no company_id/manager_user_id on User itself; that's a Company-side concern (see Company block).
+,,,
+(implicit in v1 - source TBD),-> Membership (new table),,
+v1 Field,v2 Field / Target,Disposition,Note
+(TBD - locate v1 source),user_id,Flag,FK to User. Still need to confirm where v1 actually stores Free/StarLife status before this can move past Decision Needed.
+(TBD - Free/StarLife flag),tier (enum: Free / StarLife),Transform,"CONFIRMED 2026-08-12: separate Membership table chosen over a flat field on User, to support tier history/expiry."
+(new),started_at,Transform,"New field - no v1 equivalent, defaults to migration date if no better source found."
+(new),ends_at (nullable),Transform,New field - null = no expiry / not applicable.
+(new),status (active/expired/cancelled),Transform,New field.
+,,,
+Dx-card,-> Postcard (under Destination Expert),,
+v1 Field,v2 Field / Target,Disposition,Note
+name / story / intro,name / story / intro,Direct,
+coverImage,cover_media_id,Direct,
+country / region,country_id / region_id,Direct,
+tag_group / tags,"FacetAssignment (owned_type=postcard, via 'Experience' FacetType)",Transform,Updated to match the Tag-as-'Experience' extension decision.
+category / environment,facet_value_id,Transform,Same Facet transform as Album.
+,,,
+Album,-> Collection,,
+v1 Field,v2 Field / Target,Disposition,Note
+name,Collection.name,Direct,
+intro,Collection.intro,Direct,
+story,Collection.story,Direct,
+coverImage,Collection.cover_media_id,Direct,Resolve via Media ID-mapping table.
+isFeatured,Collection.is_featured,Direct,
+slug,Collection.slug,Direct,
+country / region / locality,Collection.country_id / region_id / locality_id,Transform,"REVISED 2026-08-05: City tier removed - 3 geo FKs (was 4). CONFIRMED 2026-08-12: matches real v1 Album schema exactly (direct country/region/locality relations, no city field in v1 either)."
+directories (M2M),Collection.collection_type_id (single FK),Transform,CONFIRMED 2026-08-12: a property belongs to exactly ONE CollectionType - v1's M2M is transformed down to a single value. Migration needs a dedupe/pick-primary rule for any v1 rows with more than one directory set.
+website,Collection.website,Direct,
+signature,Collection.signature,Direct,Confirm exact target field name - not explicitly in canonical doc.
+user,Collection.owner_user_id,Transform,"CORRECTED 2026-08-12: direct FK, NOT Circle - Circle is reserved for follow/bookmark engagement only. This is who the property belongs to."
+assignTo,Collection.assigned_to_user_id,Transform,"CORRECTED 2026-08-12: direct FK, NOT Circle - same correction as 'user'. This is who works on/edits the content."
+postcards,(no action - reverse relation),Direct,Automatically satisfied via Postcard.collection_id; not a separate field to migrate on the Album side.
+galleryCollection,"Collection.gallery (component, repeatable)",Transform,"CONFIRMED 2026-08-12: gallery of categorized image groups (e.g. rooms/exterior/amenities), not a flat list. Component shape: repeatable groups, each with a category label + images."
+seo,SEO (reusable component),Transform,"CONFIRMED 2026-08-12: reusable component, attachable wherever dynamic SEO is needed (not Collection-only)."
+category,FacetAssignment.facet_value_id (Category/'Type'-derived),Transform,See Category block above. Not in the real schema paste but reconfirmed still required.
+environment,FacetAssignment.facet_value_id (Environment-derived),Transform,See Environment block above.
+(dropped) album_themes / cuisines,(not migrated),Archived,"CONFIRMED 2026-08-12: dropped - not real v1 Album fields, artifacts of an earlier incorrect assumption."
+(dropped) company / status / priority / media_kit / additionalInfo / sustainability,(not migrated),Archived,"CONFIRMED 2026-08-12: not in the real v1 Album schema - ignored, archived as-is."
+,,,
+Locality,-> Locality (City tier REMOVED 2026-08-05),,
+v1 Field,v2 Field / Target,Disposition,Note
+name,name,Direct,Display label - not the uniqueness key (see below).
+region,region_id,Transform,"REVISED 2026-08-05: Locality now parents directly to Region (City tier removed, was Region->City->Locality). CONFIRMED 2026-08-12: no direct country_id on Locality - Country is reached via Region.country_id (one join), not denormalized here since that's not a performance concern for this table."
+(new),google_place_id,Transform,"CONFIRMED 2026-08-05: this is now the real uniqueness/dedup key, replacing the old Unique(name, city_id) constraint. CLARIFIED 2026-08-12: this is the place_id of the neighborhood/sublocality itself - a DIFFERENT, coarser place_id than the one that lives on each Collection/Postcard's own Location Component (which identifies that specific building/address). Both exist, at different levels."
+(new),lat / lng (optional),Transform,"Centroid, sourced via the Gmap Address Enrichment workstream."
+,,,
+Postcard,-> Postcard,,
+v1 Field,v2 Field / Target,Disposition,Note
+name / intro / slug / story,name / intro / slug / story,Direct,Matches canonical doc.
+album,collection_id,Direct,collection_type_id is ALWAYS populated even when collection_id is null.
+country,country_id,Transform,Only set directly if collection_id is null; otherwise inherited from Collection. No city_id (tier removed).
+user,user_id,Transform,"CORRECTED 2026-08-12: direct FK, NOT Circle (relationship=author) - same correction as Album. Circle is reserved for follow/bookmark engagement only."
+coverImage,cover_media_id,Direct,
+isFeatured / priority,is_featured / priority,Direct,
+tags,"FacetAssignment (owned_type=postcard, via 'Experience' FacetType)",Transform,EXTENSION beyond canonical doc (confirmed intentional).
+copyright / articleURL,(no direct field),Flag,copyright has no listed field in canonical Postcard schema either.
+isComplete / isFounderStory,(no direct field),Flag,Workflow/flag fields with no obvious v2 slot.
+bookmarks,Circle (relationship=bookmark),Direct,"Superseded by Circle rows, not a Postcard field. Correctly uses Circle - this IS an engagement relationship."
+album_themes,FacetAssignment.facet_value_id (owned_type=postcard),Transform,
+memories,Memory.postcard_id (inverse relation),Direct,"Memory.postcard_id is nullable, Postcard is the only content anchor."
+,,,
+City-guide,"-> CollectionCluster (RE-ANCHORED TO REGION 2026-08-05, not City)",,
+v1 Field,v2 Field / Target,Disposition,Note
+region,region_id,Direct,"CONFIRMED 2026-08-05: City Guide organized by Region, not City. cluster_type_id = 'City Guide'."
+country,country_id,Direct,"CONFIRMED 2026-08-12: real v1 schema DOES carry country as its own direct relation alongside region (not just derivable via region.country_id) - keep denormalized to match v1's own design, same as Album's country/region/locality being kept as separate direct FKs."
+description,intro,Direct,"Canonical CollectionCluster schema field is 'intro', not 'description'."
+image,cover_media_id,Direct,RESOLVED 2026-08-12: real schema confirms a single media field - was previously flagged as missing before the real schema was seen.
+follow_city_guides,(no action - reverse relation),Direct,Automatically satisfied via the Follow-city-guide/Circle(owned_type=collection_cluster) row - not a separate field to migrate here.
+communityLink,CollectionCluster.community_link,Direct,"CONFIRMED 2026-08-12: needed, EXTENSION beyond canonical doc - new field, string, carried straight over from v1."
+slug,slug,Direct,
+status,status,Transform,v1 only has draft/published (2 values) - map onto whatever the canonical CollectionCluster status enum turns out to be.
+,,,
+NEEDS SOURCE SCHEMA,"FULLY RESOLVED 2026-08-12 (architecture, not schema): there is NO join/entry table to migrate here. GENERALIZED 2026-08-12: CollectionClusterType defines TWO things per type - (1) which CollectionTypes are eligible (for City Guide: Restaurants, Shopping, Events) and (2) which FIELD is used to match Collections to a cluster instance (for City Guide: region_id). A CollectionCluster instance stores the actual value for that field (e.g. Mumbai's region_id). Rendering a cluster page = query Collections WHERE collection_type_id IN (allowed types) AND [match field] = [cluster's value] - fully derived, not curated. DIFFERENT cluster types can use DIFFERENT match fields with no collision risk: City Guide filters by region_id, while a company-based cluster (likely 'Affiliation', currently in the Deferred - Backup tab) would filter by company_id instead - since they key off different fields, a Collection's City Guide membership and its Affiliation membership are fully independent. No v1 source table needed for City Guide; CollectionClusterType's allowed-types + match-field config is new v2-only admin config, not migrated data. Revisit this same question when Affiliation is picked back up from Deferred - Backup.",,
+,,,
+Bookmark,-> Circle (bookmark),,
+v1 Field,v2 Field / Target,Disposition,Note
+user / postcard,user_id / owned_id (owned_type=postcard),Direct,"relationship='bookmark'. Matches canonical Circle enum exactly. CONFIRMED 2026-08-12: Bookmark and ALL SIX Follow-* tables are the SAME action - collapse into this one relationship value, differentiated only by owned_type. No separate 'follow' enum value exists. QUERY PATTERN LOCKED 2026-08-12: profile-page 'saved items' queries (e.g. Travel Diary) filter Circle by (user_id, owned_type) - needs a composite index on Circle(user_id, owned_type) to stay fast. Further filters (country/region/interest) join to the target entity - note Postcard.country_id is only reliable when collection_id is null, otherwise fall back to the parent Collection.country_id (same for region)."
+,,,
+Memory,-> Memory,,
+v1 Field,v2 Field / Target,Disposition,Note
+name / intro / slug,name / intro / slug,Direct,Matches canonical doc.
+date,memory_date,Direct,"Nullable, distinct from created_at."
+postcard,postcard_id,Direct,Nullable - null = standalone memory not tied to any postcard.
+album / dx_card,(no direct field),Flag,postcard_id is the only content anchor in canonical Memory schema.
+user,user_id,Direct,Already a direct FK - consistent with the Album/Postcard ownership correction.
+gallery,gallery,Direct,"1:N/M2N -> Media, multiple photos/videos."
+region / country,"region_id / country_id (no city_id, tier removed)",Direct,"Nullable, copied from postcard at creation or set manually."
+internalUrl / signature,(no direct field),Flag,
+externalUrl,external_url,Direct,
+shareType,share_type,Direct,Canonical enum: private/public/selected.
+tagged_users,tagged_user_ids,Direct,M2M -> User per canonical doc.
+,,,
+Event,-> UserEvent,,
+v1 Field,v2 Field / Target,Disposition,Note
+event_master (relation),UserEvent.event_type (enum),Transform,CONFIRMED 2026-08-12: relation collapses to a plain enum - Event-master lookup table not recreated in v2 (matches the earlier Event-master decision).
+user,UserEvent.user_id,Direct,
+meta,UserEvent.metadata,Direct,JSON preserved as-is.
+ipAddress,(not migrated),Archived,"CONFIRMED 2026-08-12: ignored, not migrated."
+ipCountry,(not migrated),Archived,"CONFIRMED 2026-08-12: ignored, not migrated."
+album / postcard / following,UserEvent.subject_type + subject_id (polymorphic),Transform,"v1 models the event's subject as separate exclusive oneToOne relations (album/postcard/following-user) instead of a generic pair - migration must detect which one is populated and set subject_type accordingly (collection/postcard/user). 'podcast' CONFIRMED 2026-08-12: ignored, not migrated - dead feature, not tracked anywhere else in this tracker."
+url,(not migrated),Archived,"CONFIRMED 2026-08-12: ignored, not migrated."
+searchData,UserEvent.search_query,Transform,"JSON preserved as-is - canonical field name may imply plain string, confirm shape."
+,,,
+Follow,-> Circle (owned_type=user),,
+v1 Field,v2 Field / Target,Disposition,Note
+follower / [target],user_id / owned_id (owned_type=user),Direct,CONFIRMED 2026-08-12: ALL SIX Follow-* tables collapse into Circle's relationship='bookmark' (same as Bookmark itself) - no separate 'follow' enum value needed anywhere. Differentiated only by owned_type.
+Follow-affiliate,-> Circle (owned_type=collection_cluster),,
+v1 Field,v2 Field / Target,Disposition,Note
+follower / [target],user_id / owned_id (owned_type=collection_cluster),Direct,CONFIRMED 2026-08-12: ALL SIX Follow-* tables collapse into Circle's relationship='bookmark' (same as Bookmark itself) - no separate 'follow' enum value needed anywhere. Differentiated only by owned_type.
+Follow-album,-> Circle (owned_type=collection),,
+v1 Field,v2 Field / Target,Disposition,Note
+follower / [target],user_id / owned_id (owned_type=collection),Direct,CONFIRMED 2026-08-12: ALL SIX Follow-* tables collapse into Circle's relationship='bookmark' (same as Bookmark itself) - no separate 'follow' enum value needed anywhere. Differentiated only by owned_type.
+Follow-city-guide,-> Circle (owned_type=collection_cluster),,
+v1 Field,v2 Field / Target,Disposition,Note
+follower / [target],user_id / owned_id (owned_type=collection_cluster),Direct,CONFIRMED 2026-08-12: ALL SIX Follow-* tables collapse into Circle's relationship='bookmark' (same as Bookmark itself) - no separate 'follow' enum value needed anywhere. Differentiated only by owned_type.
+Follow-company,-> Circle (owned_type=company),,
+v1 Field,v2 Field / Target,Disposition,Note
+follower / [target],user_id / owned_id (owned_type=company),Direct,CONFIRMED 2026-08-12: ALL SIX Follow-* tables collapse into Circle's relationship='bookmark' (same as Bookmark itself) - no separate 'follow' enum value needed anywhere. Differentiated only by owned_type.
+Follow-tag,-> Circle (owned_type=tag),,
+v1 Field,v2 Field / Target,Disposition,Note
+follower / [target],user_id / owned_id (owned_type=tag),Direct,CONFIRMED 2026-08-12: ALL SIX Follow-* tables collapse into Circle's relationship='bookmark' (same as Bookmark itself) - no separate 'follow' enum value needed anywhere. Differentiated only by owned_type.
+,,,
+(no v1 source),-> Enquiry,,
+v1 Field,v2 Field / Target,Disposition,Note
+(new),user_id,Transform,New entity - who is enquiring.
+(new),subject_type (enum: subcollection / collection / postcard) + subject_id,Transform,"CONFIRMED 2026-08-12: polymorphic, same pattern as Circle/FacetAssignment/UserEvent - today only Journeys (Subcollection) take enquiries, but Properties and Events (Collection) are expected to need enquiries too. Building this polymorphic from day one avoids a schema change when that happens."
+(new),travel_dates (start_date / end_date),Transform,New field.
+(new),number_of_travelers,Transform,New field.
+(new),message,Transform,New field - free text from the enquiry form.
+(new),status (enum: new / in_progress / responded / closed),Transform,New field - concierge workflow state.
+(new),assigned_to_user_id,Transform,"CONFIRMED 2026-08-12: direct FK (concierge staff handling this enquiry), NOT Circle - same ownership pattern as Album/Postcard/Subcollection."
+(new),created_at,Transform,New field.
+,,,
+(no v1 source),-> TravelDiaryEntry,,
+NEEDS SOURCE SCHEMA,"New v2-only entity - no v1 source, also absent from the canonical doc. Blocked on Enquiry's schema being written first - now that Enquiry is designed, revisit this next.",,
+,,,
+Tag-group,-> FacetType or FacetValue,,
+NEEDS SOURCE SCHEMA,"Confirmed to map to FacetType or FacetValue, live v1 field list not yet pulled.",,
+,,,
+Property-itinerary,-> Subcollection (SubcollectionType = 'Journey'),,
+v1 Field,v2 Field / Target,Disposition,Note
+title,Subcollection.name,Transform,"Canonical field is likely 'name', not 'title'."
+description,Subcollection.description,Direct,
+coverImage,Subcollection.cover_media_id,Direct,
+album (relation),Subcollection.collection_id,Direct,The parent Collection this Journey itinerary hangs off - anchors Subcollection to Collection.
+postcards (M2M),SubcollectionPostcard.postcard_id (join),Direct,"sequence_order = manually chosen display position, same pattern as Album's postcards."
+slug,Subcollection.slug,Direct,
+createdByUser,Subcollection.created_by_user_id,Transform,"Direct FK, NOT Circle - same ownership correction as Album/Postcard."
+status (draft/deckBuild/deckFreeze/onTrip/complete),Subcollection.status,Transform,"CONFIRMED 2026-08-12: kept as its own separate Journey-workflow enum, no harmonization with Collection.status."
+country (relation),(no separate field - derived from Collection.country_id),Transform,"CONFIRMED 2026-08-12: country is taken from the parent property (Collection), not stored separately on Subcollection - drop the v1 field, resolve via the album/collection_id relation at read time."
+dayWiseItinerary,Subcollection.day_wise_itinerary,Transform,"New field name, richtext preserved as-is."
+termsAndConditions,Subcollection.terms_and_conditions,Transform,"New field name, richtext preserved as-is."
+numberOfDays / numberOfNights / price / priceType / best_time_to_visits,-> Stay Details component (see cross-cutting block above Region),Transform,"Moved to the reusable Stay Details component rather than living directly on Subcollection - see that block for the full field-level mapping, including the new number_of_rooms/guests_per_room fields."
+,,,
+Travelogue,-> Subcollection (under Destination Expert),,
+NEEDS SOURCE SCHEMA,"Confirmed to become a Subcollection under Destination Expert, live v1 field list not yet pulled.",,

@@ -1,38 +1,56 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
 CREATE TYPE "ContentStatus" AS ENUM ('draft', 'assigned', 'submit', 'rework', 'live');
+
+-- CreateEnum
+CREATE TYPE "JourneyStatus" AS ENUM ('draft', 'deckBuild', 'deckFreeze', 'onTrip', 'complete');
 
 -- CreateEnum
 CREATE TYPE "CompanyStatus" AS ENUM ('pending', 'active', 'suspended');
 
 -- CreateEnum
-CREATE TYPE "UserTier" AS ENUM ('free', 'star_life');
+CREATE TYPE "Continent" AS ENUM ('africa', 'antarctica', 'asia', 'europe', 'north_america', 'oceania', 'south_america');
+
+-- CreateEnum
+CREATE TYPE "MembershipTier" AS ENUM ('free', 'star_life');
+
+-- CreateEnum
+CREATE TYPE "MembershipStatus" AS ENUM ('active', 'expired', 'cancelled');
 
 -- CreateEnum
 CREATE TYPE "UserRoleStatus" AS ENUM ('active', 'suspended', 'revoked');
 
 -- CreateEnum
-CREATE TYPE "FacetOwnedType" AS ENUM ('collection', 'postcard');
+CREATE TYPE "FacetOwnedType" AS ENUM ('collection', 'postcard', 'subcollection');
 
 -- CreateEnum
-CREATE TYPE "ClusterEntryType" AS ENUM ('collection', 'postcard');
+CREATE TYPE "CircleOwnedType" AS ENUM ('postcard', 'collection', 'subcollection', 'collection_cluster', 'facet_value', 'tag', 'company', 'user');
 
 -- CreateEnum
-CREATE TYPE "CircleOwnedType" AS ENUM ('postcard', 'collection', 'subcollection', 'collection_cluster', 'tag', 'company', 'user');
-
--- CreateEnum
-CREATE TYPE "CircleRelationship" AS ENUM ('author', 'assigned_staff', 'owner', 'bookmark', 'booked');
+CREATE TYPE "CircleRelationship" AS ENUM ('bookmark', 'booked');
 
 -- CreateEnum
 CREATE TYPE "ShareType" AS ENUM ('private', 'public', 'selected');
 
 -- CreateEnum
-CREATE TYPE "UserEventType" AS ENUM ('postcard_view', 'collection_view', 'search', 'bookmark', 'enquiry_submitted', 'memory_created', 'tag_click');
+CREATE TYPE "UserEventType" AS ENUM ('backlink', 'collection_view', 'postcard_view', 'postcard_collect', 'postcard_flip', 'search', 'search_experiences', 'autocomplete_search_initiated', 'autocomplete_search_completed', 'guided_search_initiated', 'guided_search_completed', 'follow_collection', 'follow_user', 'bookmark', 'enquiry_submitted', 'memory_created', 'tag_click');
 
 -- CreateEnum
 CREATE TYPE "EventSubjectType" AS ENUM ('postcard', 'collection', 'subcollection', 'collection_cluster', 'tag', 'company', 'user');
 
 -- CreateEnum
+CREATE TYPE "EnquirySubjectType" AS ENUM ('subcollection', 'collection', 'postcard');
+
+-- CreateEnum
+CREATE TYPE "EnquiryStatus" AS ENUM ('new', 'in_progress', 'responded', 'closed');
+
+-- CreateEnum
 CREATE TYPE "PriceAffinity" AS ENUM ('budget', 'mid', 'luxury');
+
+-- CreateEnum
+CREATE TYPE "PriceType" AS ENUM ('per_person', 'twin_sharing');
 
 -- CreateTable
 CREATE TABLE "collection_types" (
@@ -57,18 +75,19 @@ CREATE TABLE "collections" (
     "slug" TEXT NOT NULL,
     "cover_media_id" BIGINT,
     "seo" JSONB,
+    "gallery" JSONB,
     "is_featured" BOOLEAN NOT NULL DEFAULT false,
     "priority" INTEGER NOT NULL DEFAULT 0,
     "country_id" BIGINT,
     "region_id" BIGINT,
-    "city_id" BIGINT,
     "locality_id" BIGINT,
     "location" JSONB,
     "managed_by_company_id" BIGINT,
+    "owner_user_id" BIGINT,
+    "assigned_to_user_id" BIGINT,
     "website" TEXT,
-    "media_kit" TEXT,
-    "additional_info" TEXT,
-    "sustainability" TEXT,
+    "signature" TEXT,
+    "about" TEXT,
     "status" "ContentStatus" NOT NULL DEFAULT 'draft',
 
     CONSTRAINT "collections_pkey" PRIMARY KEY ("id")
@@ -83,13 +102,17 @@ CREATE TABLE "postcards" (
     "story" TEXT,
     "collection_type_id" BIGINT NOT NULL,
     "collection_id" BIGINT,
+    "user_id" BIGINT,
     "country_id" BIGINT,
     "region_id" BIGINT,
-    "city_id" BIGINT,
     "locality_id" BIGINT,
     "location" JSONB,
+    "seo" JSONB,
     "event_details" JSONB,
+    "website" TEXT,
+    "signature" TEXT,
     "copyright" TEXT,
+    "is_founder_story" BOOLEAN NOT NULL DEFAULT false,
     "is_featured" BOOLEAN NOT NULL DEFAULT false,
     "priority" INTEGER NOT NULL DEFAULT 0,
     "cover_media_id" BIGINT,
@@ -121,13 +144,19 @@ CREATE TABLE "subcollections" (
     "story" TEXT,
     "slug" TEXT NOT NULL,
     "tour_info" TEXT,
+    "day_wise_itinerary" TEXT,
+    "terms_and_conditions" TEXT,
     "price" DECIMAL(12,2),
+    "price_type" "PriceType",
     "number_of_nights" INTEGER,
-    "guests_min" INTEGER,
-    "guests_max" INTEGER,
+    "number_of_days" INTEGER,
+    "number_of_rooms" INTEGER,
+    "guests_per_room" INTEGER,
     "best_months" JSONB,
+    "cover_media_id" BIGINT,
     "managed_by_company_id" BIGINT,
-    "status" "ContentStatus" NOT NULL DEFAULT 'draft',
+    "created_by_user_id" BIGINT,
+    "status" "JourneyStatus" NOT NULL DEFAULT 'draft',
 
     CONSTRAINT "subcollections_pkey" PRIMARY KEY ("id")
 );
@@ -148,6 +177,8 @@ CREATE TABLE "collection_cluster_types" (
     "slug" TEXT NOT NULL,
     "description" TEXT,
     "priority" INTEGER NOT NULL DEFAULT 0,
+    "collection_type_ids" BIGINT[] DEFAULT ARRAY[]::BIGINT[],
+    "match_field" TEXT NOT NULL DEFAULT 'region_id',
 
     CONSTRAINT "collection_cluster_types_pkey" PRIMARY KEY ("id")
 );
@@ -162,23 +193,12 @@ CREATE TABLE "collection_clusters" (
     "story" TEXT,
     "country_id" BIGINT,
     "region_id" BIGINT,
-    "city_id" BIGINT,
-    "locality_id" BIGINT,
     "managed_by_company_id" BIGINT,
+    "cover_media_id" BIGINT,
+    "community_link" TEXT,
     "status" "ContentStatus" NOT NULL DEFAULT 'draft',
 
     CONSTRAINT "collection_clusters_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "collection_cluster_entries" (
-    "id" BIGSERIAL NOT NULL,
-    "cluster_id" BIGINT NOT NULL,
-    "entry_type" "ClusterEntryType" NOT NULL,
-    "entry_id" BIGINT NOT NULL,
-    "priority" INTEGER NOT NULL DEFAULT 0,
-
-    CONSTRAINT "collection_cluster_entries_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -186,6 +206,9 @@ CREATE TABLE "countries" (
     "id" BIGSERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
+    "code" TEXT,
+    "continent" "Continent",
+    "flag_media_id" BIGINT,
 
     CONSTRAINT "countries_pkey" PRIMARY KEY ("id")
 );
@@ -196,28 +219,19 @@ CREATE TABLE "regions" (
     "country_id" BIGINT NOT NULL,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
+    "lat" DECIMAL(9,6),
+    "lng" DECIMAL(9,6),
 
     CONSTRAINT "regions_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "cities" (
+CREATE TABLE "localities" (
     "id" BIGSERIAL NOT NULL,
     "region_id" BIGINT NOT NULL,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
-    "lat" DECIMAL(9,6),
-    "lng" DECIMAL(9,6),
-
-    CONSTRAINT "cities_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "localities" (
-    "id" BIGSERIAL NOT NULL,
-    "city_id" BIGINT NOT NULL,
-    "name" TEXT NOT NULL,
-    "slug" TEXT NOT NULL,
+    "google_place_id" TEXT,
     "lat" DECIMAL(9,6),
     "lng" DECIMAL(9,6),
 
@@ -230,6 +244,7 @@ CREATE TABLE "facet_types" (
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "applies_to_collection_type_id" BIGINT,
+    "applies_to_subcollection_type_id" BIGINT,
     "allows_multiple" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "facet_types_pkey" PRIMARY KEY ("id")
@@ -267,11 +282,13 @@ CREATE TABLE "tags" (
 -- CreateTable
 CREATE TABLE "companies" (
     "id" BIGSERIAL NOT NULL,
-    "name" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "contact_email" TEXT,
     "contact_phone" TEXT,
     "website" TEXT,
+    "logo_media_id" BIGINT,
+    "cover_image_media_id" BIGINT,
     "status" "CompanyStatus" NOT NULL DEFAULT 'pending',
 
     CONSTRAINT "companies_pkey" PRIMARY KEY ("id")
@@ -280,7 +297,7 @@ CREATE TABLE "companies" (
 -- CreateTable
 CREATE TABLE "user_types" (
     "id" BIGSERIAL NOT NULL,
-    "name" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "is_default" BOOLEAN NOT NULL DEFAULT false,
     "is_creator" BOOLEAN NOT NULL DEFAULT false,
@@ -294,6 +311,7 @@ CREATE TABLE "users" (
     "id" BIGSERIAL NOT NULL,
     "username" TEXT NOT NULL,
     "email" TEXT NOT NULL,
+    "slug" TEXT,
     "first_name" TEXT,
     "last_name" TEXT,
     "password_hash" TEXT,
@@ -311,12 +329,23 @@ CREATE TABLE "users" (
     "priority" INTEGER NOT NULL DEFAULT 0,
     "country_id" BIGINT,
     "region_id" BIGINT,
-    "city_id" BIGINT,
     "locality_id" BIGINT,
-    "tier" "UserTier",
+    "city_name" TEXT,
     "is_admin" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "memberships" (
+    "id" BIGSERIAL NOT NULL,
+    "user_id" BIGINT NOT NULL,
+    "tier" "MembershipTier" NOT NULL DEFAULT 'free',
+    "started_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "ends_at" TIMESTAMP(3),
+    "status" "MembershipStatus" NOT NULL DEFAULT 'active',
+
+    CONSTRAINT "memberships_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -374,7 +403,7 @@ CREATE TABLE "response_fields" (
 CREATE TABLE "responses" (
     "id" BIGSERIAL NOT NULL,
     "response_type_id" BIGINT NOT NULL,
-    "user_id" BIGINT NOT NULL,
+    "user_id" BIGINT,
     "data" JSONB NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'pending',
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -388,15 +417,17 @@ CREATE TABLE "memories" (
     "id" BIGSERIAL NOT NULL,
     "user_id" BIGINT NOT NULL,
     "postcard_id" BIGINT,
+    "collection_id" BIGINT,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "intro" TEXT,
     "memory_date" DATE,
     "country_id" BIGINT,
     "region_id" BIGINT,
-    "city_id" BIGINT,
     "locality_id" BIGINT,
     "external_url" TEXT,
+    "internal_url" TEXT,
+    "signature" TEXT,
     "share_type" "ShareType" NOT NULL DEFAULT 'private',
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -406,7 +437,7 @@ CREATE TABLE "memories" (
 -- CreateTable
 CREATE TABLE "user_events" (
     "id" BIGSERIAL NOT NULL,
-    "user_id" BIGINT NOT NULL,
+    "user_id" BIGINT,
     "event_type" "UserEventType" NOT NULL,
     "subject_type" "EventSubjectType",
     "subject_id" BIGINT,
@@ -440,9 +471,18 @@ CREATE TABLE "user_persona_tags" (
 -- CreateTable
 CREATE TABLE "media" (
     "id" BIGSERIAL NOT NULL,
+    "legacy_id" BIGINT,
     "url" TEXT NOT NULL,
-    "mime_type" TEXT,
+    "name" TEXT,
     "alt" TEXT,
+    "caption" TEXT,
+    "mime_type" TEXT,
+    "ext" TEXT,
+    "hash" TEXT,
+    "size" DECIMAL(14,2),
+    "provider" TEXT,
+    "preview_url" TEXT,
+    "provider_metadata" JSONB,
     "width" INTEGER,
     "height" INTEGER,
 
@@ -453,21 +493,18 @@ CREATE TABLE "media" (
 CREATE TABLE "enquiries" (
     "id" BIGSERIAL NOT NULL,
     "user_id" BIGINT NOT NULL,
-    "subcollection_id" BIGINT NOT NULL,
+    "subject_type" "EnquirySubjectType" NOT NULL,
+    "subject_id" BIGINT NOT NULL,
+    "start_date" DATE,
+    "end_date" DATE,
+    "number_of_travelers" INTEGER,
     "message" TEXT,
-    "status" TEXT NOT NULL DEFAULT 'pending',
+    "status" "EnquiryStatus" NOT NULL DEFAULT 'new',
+    "assigned_to_user_id" BIGINT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "enquiries_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "_PostcardTags" (
-    "A" BIGINT NOT NULL,
-    "B" BIGINT NOT NULL,
-
-    CONSTRAINT "_PostcardTags_AB_pkey" PRIMARY KEY ("A","B")
 );
 
 -- CreateTable
@@ -496,7 +533,10 @@ CREATE UNIQUE INDEX "collections_slug_key" ON "collections"("slug");
 CREATE INDEX "collections_collection_type_id_idx" ON "collections"("collection_type_id");
 
 -- CreateIndex
-CREATE INDEX "collections_country_id_region_id_city_id_locality_id_idx" ON "collections"("country_id", "region_id", "city_id", "locality_id");
+CREATE INDEX "collections_country_id_region_id_locality_id_idx" ON "collections"("country_id", "region_id", "locality_id");
+
+-- CreateIndex
+CREATE INDEX "collections_owner_user_id_idx" ON "collections"("owner_user_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "postcards_slug_key" ON "postcards"("slug");
@@ -508,7 +548,10 @@ CREATE INDEX "postcards_collection_id_idx" ON "postcards"("collection_id");
 CREATE INDEX "postcards_collection_type_id_idx" ON "postcards"("collection_type_id");
 
 -- CreateIndex
-CREATE INDEX "postcards_country_id_region_id_city_id_locality_id_idx" ON "postcards"("country_id", "region_id", "city_id", "locality_id");
+CREATE INDEX "postcards_user_id_idx" ON "postcards"("user_id");
+
+-- CreateIndex
+CREATE INDEX "postcards_country_id_region_id_locality_id_idx" ON "postcards"("country_id", "region_id", "locality_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "subcollection_types_slug_key" ON "subcollection_types"("slug");
@@ -520,6 +563,9 @@ CREATE UNIQUE INDEX "subcollections_slug_key" ON "subcollections"("slug");
 CREATE INDEX "subcollections_collection_id_idx" ON "subcollections"("collection_id");
 
 -- CreateIndex
+CREATE INDEX "subcollections_created_by_user_id_idx" ON "subcollections"("created_by_user_id");
+
+-- CreateIndex
 CREATE INDEX "subcollection_postcards_subcollection_id_sequence_order_idx" ON "subcollection_postcards"("subcollection_id", "sequence_order");
 
 -- CreateIndex
@@ -529,10 +575,10 @@ CREATE UNIQUE INDEX "collection_cluster_types_slug_key" ON "collection_cluster_t
 CREATE UNIQUE INDEX "collection_clusters_slug_key" ON "collection_clusters"("slug");
 
 -- CreateIndex
-CREATE INDEX "collection_cluster_entries_entry_type_entry_id_idx" ON "collection_cluster_entries"("entry_type", "entry_id");
+CREATE INDEX "collection_clusters_cluster_type_id_idx" ON "collection_clusters"("cluster_type_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "collection_cluster_entries_cluster_id_entry_type_entry_id_key" ON "collection_cluster_entries"("cluster_id", "entry_type", "entry_id");
+CREATE INDEX "collection_clusters_region_id_idx" ON "collection_clusters"("region_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "countries_name_key" ON "countries"("name");
@@ -544,10 +590,10 @@ CREATE UNIQUE INDEX "countries_slug_key" ON "countries"("slug");
 CREATE UNIQUE INDEX "regions_name_country_id_key" ON "regions"("name", "country_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "cities_name_region_id_key" ON "cities"("name", "region_id");
+CREATE UNIQUE INDEX "localities_google_place_id_key" ON "localities"("google_place_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "localities_name_city_id_key" ON "localities"("name", "city_id");
+CREATE UNIQUE INDEX "localities_name_region_id_key" ON "localities"("name", "region_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "facet_types_slug_key" ON "facet_types"("slug");
@@ -580,10 +626,22 @@ CREATE UNIQUE INDEX "users_username_key" ON "users"("username");
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "users_slug_key" ON "users"("slug");
+
+-- CreateIndex
+CREATE INDEX "memberships_user_id_status_idx" ON "memberships"("user_id", "status");
+
+-- CreateIndex
 CREATE INDEX "user_roles_user_id_idx" ON "user_roles"("user_id");
 
 -- CreateIndex
 CREATE INDEX "user_roles_company_id_idx" ON "user_roles"("company_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "user_roles_user_id_user_type_id_key" ON "user_roles"("user_id", "user_type_id");
+
+-- CreateIndex
+CREATE INDEX "circles_user_id_owned_type_idx" ON "circles"("user_id", "owned_type");
 
 -- CreateIndex
 CREATE INDEX "circles_user_id_relationship_owned_type_idx" ON "circles"("user_id", "relationship", "owned_type");
@@ -619,10 +677,16 @@ CREATE INDEX "memories_user_id_idx" ON "memories"("user_id");
 CREATE INDEX "memories_postcard_id_idx" ON "memories"("postcard_id");
 
 -- CreateIndex
+CREATE INDEX "memories_collection_id_idx" ON "memories"("collection_id");
+
+-- CreateIndex
 CREATE INDEX "user_events_user_id_occurred_at_idx" ON "user_events"("user_id", "occurred_at");
 
 -- CreateIndex
 CREATE INDEX "user_events_event_type_occurred_at_idx" ON "user_events"("event_type", "occurred_at");
+
+-- CreateIndex
+CREATE INDEX "user_events_subject_type_subject_id_idx" ON "user_events"("subject_type", "subject_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "user_personas_user_id_key" ON "user_personas"("user_id");
@@ -631,13 +695,19 @@ CREATE UNIQUE INDEX "user_personas_user_id_key" ON "user_personas"("user_id");
 CREATE INDEX "user_persona_tags_tag_id_weight_idx" ON "user_persona_tags"("tag_id", "weight");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "media_legacy_id_key" ON "media"("legacy_id");
+
+-- CreateIndex
+CREATE INDEX "media_url_idx" ON "media"("url");
+
+-- CreateIndex
 CREATE INDEX "enquiries_user_id_idx" ON "enquiries"("user_id");
 
 -- CreateIndex
-CREATE INDEX "enquiries_subcollection_id_idx" ON "enquiries"("subcollection_id");
+CREATE INDEX "enquiries_subject_type_subject_id_idx" ON "enquiries"("subject_type", "subject_id");
 
 -- CreateIndex
-CREATE INDEX "_PostcardTags_B_index" ON "_PostcardTags"("B");
+CREATE INDEX "enquiries_assigned_to_user_id_idx" ON "enquiries"("assigned_to_user_id");
 
 -- CreateIndex
 CREATE INDEX "_MemoryTaggedUsers_B_index" ON "_MemoryTaggedUsers"("B");
@@ -658,19 +728,25 @@ ALTER TABLE "collections" ADD CONSTRAINT "collections_country_id_fkey" FOREIGN K
 ALTER TABLE "collections" ADD CONSTRAINT "collections_region_id_fkey" FOREIGN KEY ("region_id") REFERENCES "regions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "collections" ADD CONSTRAINT "collections_city_id_fkey" FOREIGN KEY ("city_id") REFERENCES "cities"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "collections" ADD CONSTRAINT "collections_locality_id_fkey" FOREIGN KEY ("locality_id") REFERENCES "localities"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "collections" ADD CONSTRAINT "collections_managed_by_company_id_fkey" FOREIGN KEY ("managed_by_company_id") REFERENCES "companies"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "collections" ADD CONSTRAINT "collections_owner_user_id_fkey" FOREIGN KEY ("owner_user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "collections" ADD CONSTRAINT "collections_assigned_to_user_id_fkey" FOREIGN KEY ("assigned_to_user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "postcards" ADD CONSTRAINT "postcards_collection_type_id_fkey" FOREIGN KEY ("collection_type_id") REFERENCES "collection_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "postcards" ADD CONSTRAINT "postcards_collection_id_fkey" FOREIGN KEY ("collection_id") REFERENCES "collections"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "postcards" ADD CONSTRAINT "postcards_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "postcards" ADD CONSTRAINT "postcards_cover_media_id_fkey" FOREIGN KEY ("cover_media_id") REFERENCES "media"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -680,9 +756,6 @@ ALTER TABLE "postcards" ADD CONSTRAINT "postcards_country_id_fkey" FOREIGN KEY (
 
 -- AddForeignKey
 ALTER TABLE "postcards" ADD CONSTRAINT "postcards_region_id_fkey" FOREIGN KEY ("region_id") REFERENCES "regions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "postcards" ADD CONSTRAINT "postcards_city_id_fkey" FOREIGN KEY ("city_id") REFERENCES "cities"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "postcards" ADD CONSTRAINT "postcards_locality_id_fkey" FOREIGN KEY ("locality_id") REFERENCES "localities"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -697,7 +770,13 @@ ALTER TABLE "subcollections" ADD CONSTRAINT "subcollections_subcollection_type_i
 ALTER TABLE "subcollections" ADD CONSTRAINT "subcollections_collection_id_fkey" FOREIGN KEY ("collection_id") REFERENCES "collections"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "subcollections" ADD CONSTRAINT "subcollections_cover_media_id_fkey" FOREIGN KEY ("cover_media_id") REFERENCES "media"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "subcollections" ADD CONSTRAINT "subcollections_managed_by_company_id_fkey" FOREIGN KEY ("managed_by_company_id") REFERENCES "companies"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "subcollections" ADD CONSTRAINT "subcollections_created_by_user_id_fkey" FOREIGN KEY ("created_by_user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "subcollection_postcards" ADD CONSTRAINT "subcollection_postcards_subcollection_id_fkey" FOREIGN KEY ("subcollection_id") REFERENCES "subcollections"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -709,40 +788,43 @@ ALTER TABLE "subcollection_postcards" ADD CONSTRAINT "subcollection_postcards_po
 ALTER TABLE "collection_clusters" ADD CONSTRAINT "collection_clusters_cluster_type_id_fkey" FOREIGN KEY ("cluster_type_id") REFERENCES "collection_cluster_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "collection_clusters" ADD CONSTRAINT "collection_clusters_cover_media_id_fkey" FOREIGN KEY ("cover_media_id") REFERENCES "media"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "collection_clusters" ADD CONSTRAINT "collection_clusters_country_id_fkey" FOREIGN KEY ("country_id") REFERENCES "countries"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "collection_clusters" ADD CONSTRAINT "collection_clusters_region_id_fkey" FOREIGN KEY ("region_id") REFERENCES "regions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "collection_clusters" ADD CONSTRAINT "collection_clusters_city_id_fkey" FOREIGN KEY ("city_id") REFERENCES "cities"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "collection_clusters" ADD CONSTRAINT "collection_clusters_locality_id_fkey" FOREIGN KEY ("locality_id") REFERENCES "localities"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "collection_clusters" ADD CONSTRAINT "collection_clusters_managed_by_company_id_fkey" FOREIGN KEY ("managed_by_company_id") REFERENCES "companies"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "collection_cluster_entries" ADD CONSTRAINT "collection_cluster_entries_cluster_id_fkey" FOREIGN KEY ("cluster_id") REFERENCES "collection_clusters"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "countries" ADD CONSTRAINT "countries_flag_media_id_fkey" FOREIGN KEY ("flag_media_id") REFERENCES "media"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "regions" ADD CONSTRAINT "regions_country_id_fkey" FOREIGN KEY ("country_id") REFERENCES "countries"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "cities" ADD CONSTRAINT "cities_region_id_fkey" FOREIGN KEY ("region_id") REFERENCES "regions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "localities" ADD CONSTRAINT "localities_city_id_fkey" FOREIGN KEY ("city_id") REFERENCES "cities"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "localities" ADD CONSTRAINT "localities_region_id_fkey" FOREIGN KEY ("region_id") REFERENCES "regions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "facet_types" ADD CONSTRAINT "facet_types_applies_to_collection_type_id_fkey" FOREIGN KEY ("applies_to_collection_type_id") REFERENCES "collection_types"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "facet_types" ADD CONSTRAINT "facet_types_applies_to_subcollection_type_id_fkey" FOREIGN KEY ("applies_to_subcollection_type_id") REFERENCES "subcollection_types"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "facet_values" ADD CONSTRAINT "facet_values_facet_type_id_fkey" FOREIGN KEY ("facet_type_id") REFERENCES "facet_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "facet_assignments" ADD CONSTRAINT "facet_assignments_facet_value_id_fkey" FOREIGN KEY ("facet_value_id") REFERENCES "facet_values"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "companies" ADD CONSTRAINT "companies_logo_media_id_fkey" FOREIGN KEY ("logo_media_id") REFERENCES "media"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "companies" ADD CONSTRAINT "companies_cover_image_media_id_fkey" FOREIGN KEY ("cover_image_media_id") REFERENCES "media"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "users" ADD CONSTRAINT "users_profile_pic_id_fkey" FOREIGN KEY ("profile_pic_id") REFERENCES "media"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -757,10 +839,10 @@ ALTER TABLE "users" ADD CONSTRAINT "users_country_id_fkey" FOREIGN KEY ("country
 ALTER TABLE "users" ADD CONSTRAINT "users_region_id_fkey" FOREIGN KEY ("region_id") REFERENCES "regions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "users" ADD CONSTRAINT "users_city_id_fkey" FOREIGN KEY ("city_id") REFERENCES "cities"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "users" ADD CONSTRAINT "users_locality_id_fkey" FOREIGN KEY ("locality_id") REFERENCES "localities"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "users" ADD CONSTRAINT "users_locality_id_fkey" FOREIGN KEY ("locality_id") REFERENCES "localities"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "memberships" ADD CONSTRAINT "memberships_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -787,7 +869,7 @@ ALTER TABLE "response_fields" ADD CONSTRAINT "response_fields_response_type_id_f
 ALTER TABLE "responses" ADD CONSTRAINT "responses_response_type_id_fkey" FOREIGN KEY ("response_type_id") REFERENCES "response_types"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "responses" ADD CONSTRAINT "responses_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "responses" ADD CONSTRAINT "responses_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "memories" ADD CONSTRAINT "memories_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -796,13 +878,13 @@ ALTER TABLE "memories" ADD CONSTRAINT "memories_user_id_fkey" FOREIGN KEY ("user
 ALTER TABLE "memories" ADD CONSTRAINT "memories_postcard_id_fkey" FOREIGN KEY ("postcard_id") REFERENCES "postcards"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "memories" ADD CONSTRAINT "memories_collection_id_fkey" FOREIGN KEY ("collection_id") REFERENCES "collections"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "memories" ADD CONSTRAINT "memories_country_id_fkey" FOREIGN KEY ("country_id") REFERENCES "countries"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "memories" ADD CONSTRAINT "memories_region_id_fkey" FOREIGN KEY ("region_id") REFERENCES "regions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "memories" ADD CONSTRAINT "memories_city_id_fkey" FOREIGN KEY ("city_id") REFERENCES "cities"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "memories" ADD CONSTRAINT "memories_locality_id_fkey" FOREIGN KEY ("locality_id") REFERENCES "localities"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -823,13 +905,7 @@ ALTER TABLE "user_persona_tags" ADD CONSTRAINT "user_persona_tags_tag_id_fkey" F
 ALTER TABLE "enquiries" ADD CONSTRAINT "enquiries_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "enquiries" ADD CONSTRAINT "enquiries_subcollection_id_fkey" FOREIGN KEY ("subcollection_id") REFERENCES "subcollections"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "_PostcardTags" ADD CONSTRAINT "_PostcardTags_A_fkey" FOREIGN KEY ("A") REFERENCES "postcards"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "_PostcardTags" ADD CONSTRAINT "_PostcardTags_B_fkey" FOREIGN KEY ("B") REFERENCES "tags"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "enquiries" ADD CONSTRAINT "enquiries_assigned_to_user_id_fkey" FOREIGN KEY ("assigned_to_user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_MemoryTaggedUsers" ADD CONSTRAINT "_MemoryTaggedUsers_A_fkey" FOREIGN KEY ("A") REFERENCES "memories"("id") ON DELETE CASCADE ON UPDATE CASCADE;

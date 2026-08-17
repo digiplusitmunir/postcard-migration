@@ -17,12 +17,14 @@ No per-env map files are consumed — everything resolves against the DB:
 - **directory/album migration** — only for the derived-entries step (entries
   point at `collections` rows, and at the album-derived `postcards` rows for
   the non-dedicated types);
-- **seed** — the `city-guide` cluster type row (the script asserts it exists
-  and fails fast otherwise).
+- **seed** — the `city-guide` cluster type row **and its
+  `collection_type_ids`** (the script asserts both and fails fast otherwise).
 
-Schema prerequisite: migration
-`20260810080000_add_cluster_cover_and_community_link` added
-`cover_media_id` and `community_link` to `collection_clusters`.
+Schema prerequisites: migration
+`20260810080000_add_cluster_cover_and_community_link` added `cover_media_id`
+and `community_link` to `collection_clusters`;
+`20260811090000_add_cluster_type_collection_type_ids` added
+`collection_type_ids` to `collection_cluster_types`.
 
 ## The central mapping decision — legacy region → v2 city
 
@@ -55,35 +57,86 @@ Legacy `api::city-guide.city-guide` → new `collection_clusters`.
 | `follow_city_guides` | relation | — | deferred → tracker #24 (Circle `owned_type=collection_cluster`), blocked on the 'follow' relationship value |
 | `createdAt/updatedAt/publishedAt`, `createdBy/updatedBy` | Strapi housekeeping | — | dropped — no timestamp columns on clusters |
 
-### Design decision — geo-derived entries
+## What a cluster type is a cluster OF
+
+`collection_cluster_types.collection_type_ids` (`BIGINT[]`, added 2026-08-11 by
+migration `20260811090000_add_cluster_type_collection_type_ids`) declares which
+collection types a kind of cluster groups. **City Guide is a cluster of
+Restaurants + Events + Shopping**:
+
+| Cluster type | `collection_type_ids` → | Held as |
+|---|---|---|
+| City Guide (`city-guide`) | Restaurants, Events, Shopping | `entry_type='postcard'` — those types have no Collection layer |
+
+Array **order is display order**, so `[restaurants, events, shopping]` is the
+order a guide should render its sections in. It is a plain id array, not an FK
+join table: read it with `= ANY(...)`, and remember nothing stops a deleted
+collection type from leaving a dangling id (the ids come from `scripts/seed.py`,
+so in practice they track `COLLECTION_TYPES`).
+
+Seeded by `scripts/seed.py` from the 4th element of `COLLECTION_CLUSTER_TYPES`:
+
+```python
+# name, slug, priority, collection_type_slugs
+COLLECTION_CLUSTER_TYPES = [
+    ("City Guide", "city-guide", 1, ["restaurants", "events", "shopping"]),
+]
+```
+
+Slugs are resolved to ids in list order (`unnest(...) WITH ORDINALITY`), and the
+seed **fails loudly** if a slug doesn't resolve, so a typo can't silently
+shrink a cluster type's scope.
+
+### Design decision — geo-derived entries, scoped by the cluster type
 
 Legacy city-guides carry **no explicit restaurant/postcard links** — the
 legacy frontend listed content by region. The migration reproduces that
-behaviour: with `DERIVE_ENTRIES = True` (script default; notebook section 4,
-marked OPTIONAL), everything **live in the guide's region** becomes a
-`collection_cluster_entries` row at `priority 0` (re-order in the CMS later):
+behaviour, but only for content the cluster type actually clusters: with
+`DERIVE_ENTRIES = True` (script default; notebook section 4, marked OPTIONAL),
+everything **live in the guide's region whose collection type is in
+`collection_type_ids`** becomes an entry at `priority 0`:
 
 | Source | Entry |
 |---|---|
-| live `collections` in the region | `entry_type='collection'` |
-| live `postcards` in the region with `collection_id IS NULL` **and** a non-dedicated type | `entry_type='postcard'` |
+| live `collections` of an in-scope type in the region | `entry_type='collection'` |
+| live `postcards` of an in-scope type in the region with `collection_id IS NULL` | `entry_type='postcard'` |
 
-The postcard branch was added 2026-08-11 with the
-[album split](directory-album-migration.md#the-album-split-collections-vs-postcards):
-Restaurants/Events/Shopping used to be collections and were picked up by the
-first branch alone, so without it every guide would lose its
-restaurant/shopping/event entries.
+For City Guide today that means **all entries are postcards** — Restaurants,
+Events and Shopping live in `postcards` since the
+[album split](directory-album-migration.md#the-album-split-collections-vs-postcards),
+and **Properties collections are no longer derived** because Properties is not
+in the City Guide scope.
 
 - `ON CONFLICT DO NOTHING` — hand-curated additions survive re-runs, and
   rows are only ever **added, never removed**;
 - set `DERIVE_ENTRIES = False` (or skip the notebook cell) to keep clusters
   empty for hand-curation;
-- postcards that hang off a Properties collection are still **not** derived —
-  they would duplicate their parent collection; add them per-guide in the CMS
-  if wanted.
+- postcards that hang off a Properties collection are still **not** derived
+  (`collection_id IS NULL` filter) — they would duplicate their parent
+  collection; add them per-guide in the CMS if wanted;
+- widening a cluster type is a one-line seed change: add a collection type slug
+  and re-run `seed.py`, then re-run this step;
+- the script **aborts** if `collection_type_ids` is empty for `city-guide` —
+  that means `seed.py` hasn't run and nothing could be derived.
+
+!!! warning "Entries left over from a wider scope"
+    Derivation never deletes, so entries created before the scope existed can
+    sit outside it. The verification step counts them under
+    **`out-of-scope entries`** and lists the first 20 with cluster + type names.
+    In prod that is **7 Properties collection entries** (Goa 4, Jaipur 2,
+    Kolkata 1) from earlier runs — prune them, or add `properties` to the City
+    Guide scope if they are wanted:
+
+    ```sql
+    DELETE FROM collection_cluster_entries e
+     USING collection_clusters cc, collection_cluster_types cct, collections c
+     WHERE e.cluster_id = cc.id AND cct.id = cc.cluster_type_id
+       AND e.entry_type = 'collection' AND c.id = e.entry_id
+       AND NOT (c.collection_type_id = ANY(cct.collection_type_ids));
+    ```
 
 !!! warning "Re-migrating over a pre-split database"
-    A DB migrated before the split holds `entry_type='collection'` rows
+    A DB migrated before the album split holds `entry_type='collection'` rows
     pointing at the old Restaurants/Shopping/Events collections (588 in prod).
     `scripts/directory_album.py` aborts on them rather than cascading — delete
     them with the SQL it prints, then re-run this step to get the equivalent
@@ -111,18 +164,32 @@ rows are found-or-created by url. Safe to re-run.
    v2 cities left geo NULL; fix the names or set the FKs by hand.
 2. **Guides with no region** — printed list; they also fall back to a
    slug-derived name worth reviewing.
-3. **Derived entries** — review per-guide entry counts in the verification
-   output; prune or re-prioritize in the CMS (derivation never deletes).
-4. **Follow-city-guides** — run with tracker #24 once the Circle 'follow'
+3. **Derived entries** — review the per-guide collection/postcard counts in the
+   verification output; prune or re-prioritize in the CMS (derivation never
+   deletes).
+4. **Out-of-scope entries** — `out-of-scope entries` should be 0; in prod it is
+   7 (Properties collections from pre-scope runs). Prune them with the SQL
+   above, or widen the City Guide scope if they belong.
+5. **Cluster type scope** — confirm the printed
+   `cluster type 'city-guide' is a cluster of: …` line matches what the product
+   wants before trusting the derived entries.
+6. **Follow-city-guides** — run with tracker #24 once the Circle 'follow'
    relationship value lands; consumes the id map written here.
-5. **'Todo' place type** — open decision from the tracker, unresolved.
+7. **'Todo' place type** — open decision from the tracker, unresolved.
 
 ## Verification
 
-The script ends with cluster counts, field-coverage totals (city / region /
-country / cover / community link / live), entry counts, a duplicate-slug
-check and a per-guide entry listing — compare against the source CMS counts
-for the environment being migrated.
+The script ends with the cluster-type scope line, cluster counts,
+field-coverage totals (city / region / country / cover / community link /
+live), entry counts split by `entry_type`, the out-of-scope entry count and
+list, a duplicate-slug check and a per-guide `collection / postcard` entry
+listing.
+
+Expected (prod, 2026-08-11): 9 live city guides, all with city/region/country
+and a cover; **602 entries — 595 postcard, 7 collection**; the 7 collection
+rows are the out-of-scope Properties leftovers. Per guide: Bengaluru 151,
+Mumbai 90, Delhi NCR 85, Kolkata 67, Goa 55, Hyderabad 50, Jaipur 47,
+Mysuru 25, Pondicherry 25.
 
 ## Run order
 

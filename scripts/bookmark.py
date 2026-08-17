@@ -1,20 +1,21 @@
-"""Bookmark migration — legacy Strapi `bookmarks` -> new `circles` rows
-(owned_type='postcard', relationship='bookmark') — tracker row #18. First
-use of the universal Circle relationship layer.
+"""Bookmark migration — legacy Strapi `bookmarks` -> `circles`
+(owned_type='postcard', relationship='bookmark').
 
-Migration step 11 of the run order (run AFTER users.py and postcard.py — it
+Migration step 12 of the run order (run AFTER users.py and postcard.py — it
 consumes both of their per-environment map files).
 
-Scope decisions (2026-08-10):
+R4 (2026-08-12) confirms bookmarks and all six Follow-* tables are the same
+action, distinguished only by owned_type. This script handles the `postcard`
+case; scripts/follows.py handles the other six.
+
 - `user` -> user_id, `postcard` -> owned_id, both via the per-env maps.
-  Bookmarks whose user or postcard is not in its map (deleted users,
-  Designer Tours postcards) are skipped -> manual review lists. The Designer
-  Tours skips need a follow-up pass once dx-cards migrate (tracker #13).
-- `createdAt` -> added_at (when the member saved it — the one timestamp
-  carried over; falls back to now() if legacy has none).
+  Bookmarks whose user or postcard is not in its map (deleted users, Designer
+  Tours postcards) are skipped -> manual review lists. The Designer Tours skips
+  need a follow-up pass once dx-cards migrate.
+- `createdAt` -> added_at (falls back to now() if legacy has none).
 - Orphan bookmarks (no user or no postcard relation) are skipped -> printed.
-- Legacy duplicate (user, postcard) pairs collapse into one row via the
-  Circle unique key — id-sorted + DO NOTHING, so the earliest createdAt wins.
+- Legacy duplicate (user, postcard) pairs collapse into one row via the Circle
+  unique key — id-sorted + DO NOTHING, so the earliest createdAt wins.
 - Dropped: `updatedAt` (meaningless for a bookmark). Nothing else — legacy
   bookmarks carry no other fields.
 - `sequence_date` / `source_enquiry_id` stay NULL — those belong to booked
@@ -27,57 +28,7 @@ Usage:
     python scripts/bookmark.py
 """
 
-import json
-import os
-from pathlib import Path
-
-import requests
-import psycopg
-from dotenv import load_dotenv
-
-ROOT = Path(__file__).resolve().parents[1]
-load_dotenv(ROOT / ".env")
-
-CMS_BASE_URL = os.environ["CMS_BASE_URL"].rstrip("/")
-HEADERS = {"Authorization": f"Bearer {os.environ['CMS_API_TOKEN']}"}
-DATABASE_URL = os.environ["DATABASE_URL"]
-
-# map files are suffixed per environment, keyed off the DB name in DATABASE_URL
-ENV_SUFFIX = {"development": "_dev", "production": "_prod"}.get(DATABASE_URL.rsplit("/", 1)[-1], "")
-
-
-def attrs(item):
-    """Entry fields — Strapi v4 nests them under 'attributes', v5 is flat."""
-    return item.get("attributes", item)
-
-
-def rel(obj):
-    """Unwrap a populated relation — v4: {'data': {'attributes': {...}}}, v5: flat dict."""
-    if isinstance(obj, dict) and "data" in obj:
-        obj = obj["data"]
-    if not obj:
-        return None
-    return obj.get("attributes", obj)
-
-
-def fetch_all(path, params=None):
-    """Fetch every page of a Strapi collection endpoint (data/meta envelope)."""
-    items, page = [], 1
-    while True:
-        p = {"pagination[page]": page, "pagination[pageSize]": 100, "sort": "id", **(params or {})}
-        r = requests.get(f"{CMS_BASE_URL}{path}", headers=HEADERS, params=p, timeout=120)
-        r.raise_for_status()
-        body = r.json()
-        items.extend(body["data"])
-        pg = body.get("meta", {}).get("pagination", {})
-        if page >= pg.get("pageCount", 1):
-            return items
-        page += 1
-
-
-def load_map(name):
-    path = ROOT / f"{name}{ENV_SUFFIX}.json"
-    return {int(k): int(v) for k, v in json.loads(path.read_text()).items()}
+from _common import attrs, connect, fetch_all, load_map, rel
 
 
 def migrate_bookmarks(conn, bookmarks, user_map, postcard_map):
@@ -99,7 +50,7 @@ def migrate_bookmarks(conn, bookmarks, user_map, postcard_map):
                 continue
 
             new_pid = postcard_map.get(p["id"])
-            if not new_pid:  # postcard skipped in #16 (Designer Tours)
+            if not new_pid:  # postcard skipped upstream (Designer Tours)
                 unmapped_postcards.append((bm["id"], p["id"], p.get("name")))
                 continue
 
@@ -137,12 +88,11 @@ def verify(conn):
 
 
 def main():
-    conn = psycopg.connect(DATABASE_URL)
-    print("connected to:", DATABASE_URL.rsplit("/", 1)[-1])
+    conn = connect()
 
     user_map = load_map("legacy_user_id_map")
     postcard_map = load_map("legacy_postcard_id_map")
-    print(f"loaded {len(user_map)} user mappings, {len(postcard_map)} postcard mappings ({ENV_SUFFIX or 'no suffix'})")
+    print(f"loaded {len(user_map)} user mappings, {len(postcard_map)} postcard mappings")
 
     bookmarks = sorted(fetch_all("/api/bookmarks", {"populate": "*"}), key=lambda x: x["id"])
     print(f"fetched {len(bookmarks)} bookmarks")

@@ -1,37 +1,45 @@
 """Media migration — legacy Strapi upload `files` -> new `media` table.
 
-Migration 2a of the run order (after geo, before company/user migration).
+Migration step 3 of the run order.
 
-The upload plugin endpoint /api/upload/files returns FLAT objects (no
-data/attributes envelope). Pagination support varies by Strapi version, so
-the fetch loop guards against a server that ignores the pagination params.
+The tracker calls this an EXACT match ("no field changes"), and the new `media`
+table now really is one: every field the upload plugin exposes has a column.
 
-Mapping: url (made absolute when relative) -> url, mime -> mime_type,
-alternativeText (fallback caption, then name) -> alt, width/height as-is.
-formats, hash, ext, size, caption, provider, folder are DROPPED.
+  legacy id       -> legacy_id  (UNIQUE — the permanent old->new mapping the
+                                 tracker asks for, and this script's idempotency
+                                 key; no separate map file is needed)
+  url             -> url        (made absolute when the plugin returns a
+                                 relative upload path)
+  name            -> name
+  alternativeText -> alt
+  caption         -> caption    (no longer folded into alt)
+  mime            -> mime_type
+  ext / hash / size / provider / previewUrl / provider_metadata / width / height
+                  -> same-named columns
 
-media.url has no unique constraint, so idempotency is select-then-insert
-on url. Safe to re-run.
+Nothing is dropped. `formats` is not exposed by this endpoint and therefore has
+no column.
+
+Legacy duplicates are NOT collapsed: one legacy file = one media row, so every
+legacy id keeps a mapping. Two rows may share a url; that is intentional and
+harmless.
+
+Idempotent — upsert on legacy_id. Safe to re-run.
 
 Usage:
     python scripts/media.py
 """
 
-import os
-from pathlib import Path
-
 import requests
-import psycopg
-from dotenv import load_dotenv
+from psycopg.types.json import Json
 
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
-
-CMS_BASE_URL = os.environ["CMS_BASE_URL"].rstrip("/")
-HEADERS = {"Authorization": f"Bearer {os.environ['CMS_API_TOKEN']}"}
-DATABASE_URL = os.environ["DATABASE_URL"]
+from _common import CMS_BASE_URL, HEADERS, MEDIA_COLUMNS, absolute_url, connect, media_values
 
 
 def fetch_files():
+    """The upload endpoint returns FLAT objects (no data/attributes envelope)
+    and its pagination support varies by Strapi version, so guard against a
+    server that ignores the pagination params and returns everything at once."""
     files, seen, start, limit = [], set(), 0, 100
     while True:
         r = requests.get(
@@ -54,58 +62,55 @@ def fetch_files():
 
 
 def main():
-    conn = psycopg.connect(DATABASE_URL)
-    print("connected to:", DATABASE_URL.rsplit("/", 1)[-1])
+    conn = connect()
 
-    legacy_files = fetch_files()
+    legacy_files = sorted(fetch_files(), key=lambda f: f["id"])
     print(f"fetched {len(legacy_files)} files")
 
-    inserted = updated = skipped_no_url = 0
-    seen_urls = set()
+    upserted = skipped_no_url = 0
 
     with conn.cursor() as cur:
         for f in legacy_files:
-            url = (f.get("url") or "").strip()
-            if not url:
+            if not absolute_url(f.get("url")):
                 skipped_no_url += 1
                 continue
-            if url.startswith("/"):  # relative upload path -> absolute
-                url = CMS_BASE_URL + url
-            if url in seen_urls:  # legacy duplicates collapse into one media row
-                continue
-            seen_urls.add(url)
-
-            alt = f.get("alternativeText") or f.get("caption") or f.get("name") or None
-            mime = f.get("mime")
-            width, height = f.get("width"), f.get("height")
-
-            cur.execute("SELECT id FROM media WHERE url = %s", (url,))
-            row = cur.fetchone()
-            if row:
-                cur.execute(
-                    """
-                    UPDATE media SET mime_type = %s, alt = %s, width = %s, height = %s
-                    WHERE id = %s
-                    """,
-                    (mime, alt, width, height, row[0]),
-                )
-                updated += 1
-            else:
-                cur.execute(
-                    """
-                    INSERT INTO media (url, mime_type, alt, width, height)
-                    VALUES (%s, %s, %s, %s, %s)
-                    """,
-                    (url, mime, alt, width, height),
-                )
-                inserted += 1
+            cur.execute(
+                f"""
+                INSERT INTO media ({MEDIA_COLUMNS})
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (legacy_id) DO UPDATE
+                SET url               = EXCLUDED.url,
+                    name              = EXCLUDED.name,
+                    alt               = EXCLUDED.alt,
+                    caption           = EXCLUDED.caption,
+                    mime_type         = EXCLUDED.mime_type,
+                    ext               = EXCLUDED.ext,
+                    hash              = EXCLUDED.hash,
+                    size              = EXCLUDED.size,
+                    provider          = EXCLUDED.provider,
+                    preview_url       = EXCLUDED.preview_url,
+                    provider_metadata = EXCLUDED.provider_metadata,
+                    width             = EXCLUDED.width,
+                    height            = EXCLUDED.height
+                """,
+                media_values(f),
+            )
+            upserted += 1
 
     conn.commit()
-    print(f"media inserted: {inserted}, updated: {updated}, skipped (no url): {skipped_no_url}")
+    print(f"media upserted: {upserted}, skipped (no url): {skipped_no_url}")
 
     with conn.cursor() as cur:
-        cur.execute("SELECT COUNT(*) FROM media")
-        print("media total :", cur.fetchone()[0])
+        for label, q in [
+            ("media total",        "SELECT COUNT(*) FROM media"),
+            ("with legacy_id",     "SELECT COUNT(*) FROM media WHERE legacy_id IS NOT NULL"),
+            ("with alt",           "SELECT COUNT(*) FROM media WHERE alt IS NOT NULL"),
+            ("with caption",       "SELECT COUNT(*) FROM media WHERE caption IS NOT NULL"),
+            ("with dimensions",    "SELECT COUNT(*) FROM media WHERE width IS NOT NULL"),
+            ("distinct urls",      "SELECT COUNT(DISTINCT url) FROM media"),
+        ]:
+            cur.execute(q)
+            print(f"{label:18}: {cur.fetchone()[0]}")
     conn.close()
 
 
