@@ -1,0 +1,2789 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Strapi → PostgreSQL/Prisma migration documentation for Postcard Travel Club">
+      
+      
+      
+      
+        <link rel="prev" href="../implementation/">
+      
+      
+        <link rel="next" href="../01-seed-types/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>00. Cross-cutting Changes - Postcard Migration Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#00-cross-cutting-changes" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Postcard Migration Docs" class="md-header__button md-logo" aria-label="Postcard Migration Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Postcard Migration Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              00. Cross-cutting Changes
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Postcard Migration Docs" class="md-nav__button md-logo" aria-label="Postcard Migration Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Postcard Migration Docs
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prerequisites
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Prerequisites
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/postgresql-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PostgreSQL Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/prisma-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prisma Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../get-started/initialisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Initialisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../get-started/seed-scripts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Seed Scripts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../get-started/migration-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migration Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../migrations/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrations
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Migrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/geo-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Geo Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/geo_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo Migration — Country / Region / City / Locality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/media-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. Media Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/company-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. Company Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/media_usertypes_companies_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Media / User Types / Companies Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/user-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. User Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/user_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Migration — up_users → users + user_roles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/directory-album-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Directory & Album Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/directory_album_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Directory → CollectionType &amp; Album → Collection or Postcard migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/tags-facet-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Tags Facet Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/tags_facet_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tag → FacetType 'Experience' migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/postcard-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. Postcard Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/postcard_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Postcard migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/journey-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Journey Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/journey_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Journey (property-itinerary) migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/cityguide-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. City Guide Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/cityguide_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    City Guide migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/bookmark-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. Bookmark Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/bookmark_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bookmark migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Change Plan
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Schema Change Plan
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../implementation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implementation Report & Runbook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    00. Cross-cutting Changes
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    00. Cross-cutting Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#x1-geo-tier-removal-r1-tracker-2026-08-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        X1. Geo tier removal (R1, tracker 2026-08-05)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="X1. Geo tier removal (R1, tracker 2026-08-05)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#locality-uniqueness-changes-meaning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Locality uniqueness changes meaning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#script-impact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Script impact
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#x2-location-component-tracker-cross-cutting-location-component" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        X2. Location component (tracker: (cross-cutting) Location Component)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="X2. Location component (tracker: (cross-cutting) Location Component)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#target-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schema-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#script-impact_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Script impact
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#x3-stay-details-component-r5-tracker-2026-08-12-correction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        X3. Stay Details component (R5, tracker 2026-08-12 CORRECTION)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="X3. Stay Details component (R5, tracker 2026-08-12 CORRECTION)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#target-shape_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schema-impact-on-subcollections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema impact on subcollections
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#x4-ownership-is-a-direct-fk-not-a-circle-r3-tracker-2026-08-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        X4. Ownership is a direct FK, not a Circle (R3, tracker 2026-08-12)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="X4. Ownership is a direct FK, not a Circle (R3, tracker 2026-08-12)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#new-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enum-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enum change
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#script-impact_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Script impact
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#x5-circle-consolidation-r4-tracker-2026-08-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        X5. Circle consolidation (R4, tracker 2026-08-12)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="X5. Circle consolidation (R4, tracker 2026-08-12)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required index
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#x6-media-identity-tracker-upload-file-media" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        X6. Media identity (tracker: Upload - File → Media)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-seed-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01. Seed Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02. Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-media/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03. Media
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-company/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04. Company
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-users/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05. Users
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-directory-album/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06. Directory & Album
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-tags-facet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07. Tags Facet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-postcard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08. Postcard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-journey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09. Journey
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-cityguide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. City Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11-bookmark/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11. Bookmark
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12-category-environment-facet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12. Category & Environment Facet — NEW
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-not-yet-scripted/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13. Not Yet Scripted
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#x1-geo-tier-removal-r1-tracker-2026-08-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        X1. Geo tier removal (R1, tracker 2026-08-05)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="X1. Geo tier removal (R1, tracker 2026-08-05)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#locality-uniqueness-changes-meaning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Locality uniqueness changes meaning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#script-impact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Script impact
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#x2-location-component-tracker-cross-cutting-location-component" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        X2. Location component (tracker: (cross-cutting) Location Component)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="X2. Location component (tracker: (cross-cutting) Location Component)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#target-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schema-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#script-impact_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Script impact
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#x3-stay-details-component-r5-tracker-2026-08-12-correction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        X3. Stay Details component (R5, tracker 2026-08-12 CORRECTION)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="X3. Stay Details component (R5, tracker 2026-08-12 CORRECTION)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#target-shape_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target shape
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schema-impact-on-subcollections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema impact on subcollections
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#x4-ownership-is-a-direct-fk-not-a-circle-r3-tracker-2026-08-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        X4. Ownership is a direct FK, not a Circle (R3, tracker 2026-08-12)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="X4. Ownership is a direct FK, not a Circle (R3, tracker 2026-08-12)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#new-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enum-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enum change
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#script-impact_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Script impact
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#x5-circle-consolidation-r4-tracker-2026-08-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        X5. Circle consolidation (R4, tracker 2026-08-12)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="X5. Circle consolidation (R4, tracker 2026-08-12)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required index
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#x6-media-identity-tracker-upload-file-media" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        X6. Media identity (tracker: Upload - File → Media)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="00-cross-cutting-changes">00 — Cross-cutting changes</h1>
+<p>Changes that are not owned by any single script but land on several tables at
+once. Every per-table file references back here.</p>
+<hr />
+<h2 id="x1-geo-tier-removal-r1-tracker-2026-08-05">X1. Geo tier removal (R1, tracker 2026-08-05)</h2>
+<blockquote>
+<p>"GEO CHANGE 2026-08-05: City tier REMOVED — 3-tier Country/Region/Locality,
+disambiguated via Locality.google_place_id; City Guide re-anchors to Region."</p>
+</blockquote>
+<p>Target hierarchy: <code>Country → Region → Locality</code>.</p>
+<h3 id="schema">Schema</h3>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Delete model</strong></td>
+<td><code>City</code></td>
+</tr>
+<tr>
+<td><strong>Drop column</strong></td>
+<td><code>collections.city_id</code></td>
+</tr>
+<tr>
+<td><strong>Drop column</strong></td>
+<td><code>postcards.city_id</code></td>
+</tr>
+<tr>
+<td><strong>Drop column</strong></td>
+<td><code>collection_clusters.city_id</code></td>
+</tr>
+<tr>
+<td><strong>Drop column</strong></td>
+<td><code>users.city_id</code></td>
+</tr>
+<tr>
+<td><strong>Drop column</strong></td>
+<td><code>memories.city_id</code></td>
+</tr>
+<tr>
+<td><strong>Drop column</strong></td>
+<td><code>localities.city_id</code></td>
+</tr>
+<tr>
+<td><strong>Add column</strong></td>
+<td><code>localities.region_id</code> (BigInt, required, FK → <code>regions.id</code>)</td>
+</tr>
+<tr>
+<td><strong>Add column</strong></td>
+<td><code>localities.google_place_id</code> (String, <strong>unique</strong>)</td>
+</tr>
+<tr>
+<td><strong>Add column</strong></td>
+<td><code>localities.lat</code> / <code>localities.lng</code> (Decimal(9,6), nullable) — already present, keep</td>
+</tr>
+<tr>
+<td><strong>Drop constraint</strong></td>
+<td><code>localities @@unique([name, cityId])</code></td>
+</tr>
+<tr>
+<td><strong>Add constraint</strong></td>
+<td><code>localities @@unique([google_place_id])</code></td>
+</tr>
+<tr>
+<td><strong>Drop relation</strong></td>
+<td><code>City[]</code> back-relations on <code>Country</code>? — no, <code>City</code> hangs off <code>Region</code>; remove <code>Region.cities</code>, and every <code>City[]</code> back-relation on Collection/Postcard/CollectionCluster/User/Memory/Locality</td>
+</tr>
+</tbody>
+</table>
+<p>Note the <code>lat</code>/<code>lng</code> that currently live on <code>City</code> (centroid for map default
+zoom) have no home once <code>City</code> is gone — <code>Region</code> has no <code>lat</code>/<code>lng</code>. If the map
+still needs a region centroid, add <code>regions.lat</code> / <code>regions.lng</code>. <strong>Flagging as
+an unlisted gap in the tracker.</strong></p>
+<h3 id="locality-uniqueness-changes-meaning">Locality uniqueness changes meaning</h3>
+<p>Old: <code>Unique(name, city_id)</code> — name was the key.
+New: <code>google_place_id</code> is the key; <code>name</code> is a display label only.</p>
+<blockquote>
+<p>"this is the place_id of the neighborhood/sublocality itself — a DIFFERENT,
+coarser place_id than the one on each Collection/Postcard's own Location
+Component (which identifies that specific building/address). Both exist, at
+different levels."</p>
+</blockquote>
+<p><code>google_place_id</code> has <strong>no v1 source</strong> — it comes from the Gmap Address
+Enrichment workstream. So the migration cannot enforce the unique key on first
+load. Plan: load with <code>google_place_id</code> NULL, enrich, then add the unique
+constraint in a follow-up migration.</p>
+<h3 id="script-impact">Script impact</h3>
+<ul>
+<li><code>geo_migration.py</code> — <strong>the placeholder-city block is deleted outright</strong>
+  (lines 116–125 synthesize one city per region; lines 142–151 then parent
+  localities to that fake city). Localities parent straight to Region by name.</li>
+<li><code>cityguide.py</code> — the entire "legacy region → v2 city" matching path
+  (<code>cities_by_name</code>, <code>city_missing</code>, <code>city_ambiguous</code>) is deleted. See <a href="../10-cityguide/">10</a>.</li>
+<li><code>directory_album.py</code>, <code>postcard.py</code> — remove <code>city_id</code> from the INSERT column
+  lists (both already pass literal <code>NULL</code>, so this is cosmetic but should go).</li>
+<li><code>users.py</code> — the <code>MANUAL REVIEW — free-text city to resolve to city_id</code> list
+  becomes moot; free-text <code>city</code> maps to <code>location.city_name</code> instead (see X2)
+  or is archived.</li>
+</ul>
+<hr />
+<h2 id="x2-location-component-tracker-cross-cutting-location-component">X2. Location component (tracker: <em>(cross-cutting) Location Component</em>)</h2>
+<p>Embedded on <code>Collection</code>, <code>Postcard</code>, <code>CollectionCluster</code>. Currently a
+free-form <code>Json?</code> field written ad-hoc by <code>directory_album.py</code> as
+<code>{lat, lng, google_place_id, location_link}</code>.</p>
+<h3 id="target-shape">Target shape</h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>v1 source</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>address</code></td>
+<td><code>formatted_address</code></td>
+<td>Google's full formatted string, kept as-is for display</td>
+</tr>
+<tr>
+<td><code>street_number</code></td>
+<td><em>(new)</em></td>
+<td>From Google <code>address_components</code></td>
+</tr>
+<tr>
+<td><code>route</code></td>
+<td><em>(new)</em></td>
+<td>Street name</td>
+</tr>
+<tr>
+<td><code>subpremise</code></td>
+<td><em>(new, optional)</em></td>
+<td>Unit/apt/suite, when Google returns one</td>
+</tr>
+<tr>
+<td><code>postal_code</code></td>
+<td><em>(new)</em></td>
+<td>From <code>address_components</code></td>
+</tr>
+<tr>
+<td><code>admin_area_level_2</code></td>
+<td><em>(new, optional)</em></td>
+<td>County/district — <strong>reference only, NOT a geo tier</strong></td>
+</tr>
+<tr>
+<td><code>city_name</code></td>
+<td>v1 <code>locality</code></td>
+<td><strong>Free text, NOT a foreign key.</strong> Since City is no longer a tier this is informational display text only</td>
+</tr>
+<tr>
+<td><code>lat</code> / <code>lng</code></td>
+<td><em>(no v1 source)</em></td>
+<td>Derived by geocoding the country/region/locality relations</td>
+</tr>
+<tr>
+<td><code>google_place_id</code></td>
+<td><code>place_id</code></td>
+<td>Building/address-level — distinct from <code>Locality.google_place_id</code></td>
+</tr>
+</tbody>
+</table>
+<p>Fields that route to the geo <strong>tables</strong>, not the component:
+<code>administrative_area_level_1 → Region.name</code>,
+<code>sublocality / neighborhood → Locality.name</code>,
+<code>country → Country.name</code>.</p>
+<h3 id="schema-decision">Schema decision</h3>
+<p>Keep as <code>Json?</code> (Prisma cannot express a reusable embedded component), but
+document the shape in a schema comment and validate it at the service layer.
+No column change needed — this is a <strong>write-shape</strong> change in the scripts.</p>
+<h3 id="script-impact_1">Script impact</h3>
+<ul>
+<li><code>directory_album.py</code> line 321 currently emits <code>location_link</code>, which is <strong>not
+  in the target shape</strong> — it is a legacy Strapi field with no target. Either map
+  it into the component as a documented extension or drop it. Currently it is
+  silently carried.</li>
+<li>Nothing populates <code>address</code>, <code>street_number</code>, <code>route</code>, <code>subpremise</code>,
+  <code>postal_code</code>, <code>admin_area_level_2</code>, <code>city_name</code> today. All are marked
+  "Transform" in the tracker but most have no v1 source — they are Gmap
+  Address Enrichment outputs. <strong>These stay empty at migration time.</strong></li>
+</ul>
+<hr />
+<h2 id="x3-stay-details-component-r5-tracker-2026-08-12-correction">X3. Stay Details component (R5, tracker 2026-08-12 CORRECTION)</h2>
+<p>Attaches to <code>Subcollection</code> (Journey), "and elsewhere as needed".</p>
+<blockquote>
+<p>"CORRECTION 2026-08-12: real v1 pattern is ONE price field + a priceType enum
+('per person'/'twin sharing') — NOT two separate price columns as the earlier
+(incorrect, pre-real-schema) Album draft assumed. CONFIRMED: the '2nd price'
+display value is CALCULATED via a formula off the stored price at
+read/display time — no separate v1 data needed for it."</p>
+</blockquote>
+<h3 id="target-shape_1">Target shape</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>v1 source</th>
+<th>Disposition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>number_of_days</code></td>
+<td><code>numberOfDays</code></td>
+<td>Direct</td>
+</tr>
+<tr>
+<td><code>number_of_nights</code></td>
+<td><code>numberOfNights</code></td>
+<td>Direct</td>
+</tr>
+<tr>
+<td><code>price</code></td>
+<td><code>price</code></td>
+<td>Direct — <strong>single</strong> price field</td>
+</tr>
+<tr>
+<td><code>price_type</code></td>
+<td><code>priceType</code></td>
+<td>Transform → enum <code>per_person</code> / <code>twin_sharing</code></td>
+</tr>
+<tr>
+<td><code>best_months</code></td>
+<td><code>best_time_to_visits</code> (oneToMany → Month entity)</td>
+<td>Transform — iterate the relation</td>
+</tr>
+<tr>
+<td><code>number_of_rooms</code></td>
+<td><em>(new)</em></td>
+<td>No v1 source</td>
+</tr>
+<tr>
+<td><code>guests_per_room</code></td>
+<td><em>(new)</em></td>
+<td>No v1 source. Angel's "number of persons per room" lives here</td>
+</tr>
+</tbody>
+</table>
+<h3 id="schema-impact-on-subcollections">Schema impact on <code>subcollections</code></h3>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Column</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>DROP</strong></td>
+<td><code>price_starting_at</code></td>
+<td>Built on the retracted dual-price assumption. Reverts migration <code>20260806060000_add_subcollection_price_starting_at</code></td>
+</tr>
+<tr>
+<td><strong>DROP</strong></td>
+<td><code>guests_min</code></td>
+<td>Replaced by <code>number_of_rooms</code> + <code>guests_per_room</code></td>
+</tr>
+<tr>
+<td><strong>DROP</strong></td>
+<td><code>guests_max</code></td>
+<td>Same</td>
+</tr>
+<tr>
+<td><strong>ADD</strong></td>
+<td><code>price_type</code> (enum <code>PriceType</code>)</td>
+<td>Was being <strong>dropped on the floor</strong> by <code>journey.py</code></td>
+</tr>
+<tr>
+<td><strong>ADD</strong></td>
+<td><code>number_of_rooms</code> (Int?)</td>
+<td>New, no v1 source</td>
+</tr>
+<tr>
+<td><strong>ADD</strong></td>
+<td><code>guests_per_room</code> (Int?)</td>
+<td>New, no v1 source</td>
+</tr>
+<tr>
+<td><strong>KEEP</strong></td>
+<td><code>price</code>, <code>number_of_nights</code>, <code>number_of_days</code>, <code>best_months</code></td>
+<td>Already correct</td>
+</tr>
+</tbody>
+</table>
+<p><code>journey.py</code> currently <strong>discards <code>priceType</code></strong> and only prints non-default rows
+for review (lines 200–201, and the <code>twin_sharing</code> manual-review list). Once
+<code>price_type</code> exists, that data is migrated instead of reported.</p>
+<hr />
+<h2 id="x4-ownership-is-a-direct-fk-not-a-circle-r3-tracker-2026-08-12">X4. Ownership is a direct FK, not a Circle (R3, tracker 2026-08-12)</h2>
+<blockquote>
+<p>"OWNERSHIP CHANGE 2026-08-12: Circle is reserved for follow/bookmark
+engagement only — ownership/assignment (user/assignTo) fields are direct FKs,
+not Circle."</p>
+</blockquote>
+<h3 id="new-columns">New columns</h3>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Column</th>
+<th>v1 source</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>collections</code></td>
+<td><code>owner_user_id</code></td>
+<td>Album <code>user</code></td>
+<td>Who the property belongs to</td>
+</tr>
+<tr>
+<td><code>collections</code></td>
+<td><code>assigned_to_user_id</code></td>
+<td>Album <code>assignTo</code></td>
+<td>Who works on / edits the content</td>
+</tr>
+<tr>
+<td><code>postcards</code></td>
+<td><code>user_id</code></td>
+<td>Postcard <code>user</code></td>
+<td>Author</td>
+</tr>
+<tr>
+<td><code>subcollections</code></td>
+<td><code>created_by_user_id</code></td>
+<td>Property-itinerary <code>createdByUser</code></td>
+<td>Author</td>
+</tr>
+<tr>
+<td><code>enquiries</code></td>
+<td><code>assigned_to_user_id</code></td>
+<td><em>(new)</em></td>
+<td>Concierge staff handling it</td>
+</tr>
+</tbody>
+</table>
+<p>All nullable, FK → <code>users.id</code>.</p>
+<h3 id="enum-change">Enum change</h3>
+<p><code>CircleRelationship</code> loses three values:</p>
+<div class="highlight"><pre><span></span><code>enum CircleRelationship {
+  author           // DELETE — now Postcard.user_id / Subcollection.created_by_user_id
+  assigned_staff   // DELETE — now Collection.assigned_to_user_id
+  owner            // DELETE — now Collection.owner_user_id
+  bookmark         // keep
+  booked           // keep
+}
+</code></pre></div>
+<h3 id="script-impact_2">Script impact</h3>
+<p>The "optional author/assigned_staff circles" sections that live only in the
+notebooks (<code>directory_album_migration.ipynb</code> §6, <code>postcard_migration.ipynb</code> §6,
+<code>journey_migration.ipynb</code> §6) are now <strong>wrong</strong> and must be replaced with a
+direct-FK write in the <code>.py</code> scripts. Per the repo rule, notebook changes go out
+as paste-able cell snippets, not direct edits.</p>
+<p><code>directory_album.py</code>, <code>postcard.py</code>, <code>journey.py</code> each need the legacy
+<code>user</code> / <code>assignTo</code> / <code>createdByUser</code> relation resolved through
+<code>legacy_user_id_map{_dev,_prod}.json</code> (already produced by <code>users.py</code>) and
+written into the new column.</p>
+<hr />
+<h2 id="x5-circle-consolidation-r4-tracker-2026-08-12">X5. Circle consolidation (R4, tracker 2026-08-12)</h2>
+<blockquote>
+<p>"CIRCLE CONSOLIDATION 2026-08-12: Bookmark + all 6 Follow-* tables collapse
+into ONE relationship='bookmark' value, differentiated only by owned_type."</p>
+</blockquote>
+<p>No new enum values — <code>CircleOwnedType</code> already has all seven targets
+(<code>postcard</code>, <code>collection</code>, <code>subcollection</code>, <code>collection_cluster</code>, <code>tag</code>,
+<code>company</code>, <code>user</code>). <strong>No schema change to the enum.</strong></p>
+<h3 id="required-index">Required index</h3>
+<blockquote>
+<p>"QUERY PATTERN LOCKED 2026-08-12: profile-page 'saved items' queries (e.g.
+Travel Diary) filter Circle by (user_id, owned_type) — needs a composite index
+on Circle(user_id, owned_type) to stay fast."</p>
+</blockquote>
+<p>Current indexes are <code>(user_id, relationship, owned_type)</code> and
+<code>(owned_type, owned_id)</code>. The existing three-column index does <strong>not</strong> serve
+<code>(user_id, owned_type)</code> because <code>relationship</code> sits between them.</p>
+<p><strong>ADD</strong> <code>@@index([userId, ownedType])</code> on <code>Circle</code>.</p>
+<h3 id="migration-mapping">Migration mapping</h3>
+<table>
+<thead>
+<tr>
+<th>v1 table</th>
+<th><code>owned_type</code></th>
+<th><code>relationship</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bookmarks</code></td>
+<td><code>postcard</code></td>
+<td><code>bookmark</code></td>
+</tr>
+<tr>
+<td><code>follows</code></td>
+<td><code>user</code></td>
+<td><code>bookmark</code></td>
+</tr>
+<tr>
+<td><code>follow_albums</code></td>
+<td><code>collection</code></td>
+<td><code>bookmark</code></td>
+</tr>
+<tr>
+<td><code>follow_companies</code></td>
+<td><code>company</code></td>
+<td><code>bookmark</code></td>
+</tr>
+<tr>
+<td><code>follow_tags</code></td>
+<td><code>tag</code></td>
+<td><code>bookmark</code></td>
+</tr>
+<tr>
+<td><code>follow_city_guides</code></td>
+<td><code>collection_cluster</code></td>
+<td><code>bookmark</code></td>
+</tr>
+<tr>
+<td><code>follow_affiliates</code></td>
+<td><code>collection_cluster</code></td>
+<td><code>bookmark</code></td>
+</tr>
+</tbody>
+</table>
+<p>Note the last two both land on <code>collection_cluster</code>. That is intentional per the
+tracker, but it means a City Guide follow and an Affiliation follow are
+indistinguishable in <code>circles</code> unless the cluster's own <code>cluster_type_id</code>
+disambiguates them. It does — no data loss.</p>
+<hr />
+<h2 id="x6-media-identity-tracker-upload-file-media">X6. Media identity (tracker: <em>Upload - File → Media</em>)</h2>
+<blockquote>
+<p>"-&gt; Media (confirmed 2026-08-05: exact match, no field changes)"
+"id (numeric) → id (UUID). Build and retain a permanent old-numeric-ID →
+new-UUID mapping table."</p>
+</blockquote>
+<p>The current <code>Media</code> model is described in the schema header as a "minimal stub".
+It is <strong>not</strong> an exact match — it keeps only 5 of the 12 mapped fields. See
+<a href="../03-media/">03-media.md</a> for the full column list.</p>
+<p><strong>Decision D2</strong> — the UUID switch is the single most expensive item in this
+plan. <code>media.id</code> is referenced by 8 relations across 6 tables. Recommend
+<strong>keeping <code>BigInt</code></strong> and satisfying the tracker's real requirement (a permanent
+legacy-id mapping) with a <code>media.legacy_id</code> column, unless the UUID is a hard
+external requirement.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

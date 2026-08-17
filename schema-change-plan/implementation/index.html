@@ -1,0 +1,3050 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Strapi → PostgreSQL/Prisma migration documentation for Postcard Travel Club">
+      
+      
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../00-cross-cutting/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Implementation Report & Runbook - Postcard Migration Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#implementation-report-runbook" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Postcard Migration Docs" class="md-header__button md-logo" aria-label="Postcard Migration Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Postcard Migration Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Implementation Report & Runbook
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Postcard Migration Docs" class="md-nav__button md-logo" aria-label="Postcard Migration Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Postcard Migration Docs
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prerequisites
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Prerequisites
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/postgresql-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PostgreSQL Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/prisma-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prisma Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../get-started/initialisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Initialisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../get-started/seed-scripts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Seed Scripts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../get-started/migration-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migration Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../migrations/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrations
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Migrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/geo-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Geo Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/geo_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo Migration — Country / Region / City / Locality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/media-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. Media Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/company-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. Company Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/media_usertypes_companies_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Media / User Types / Companies Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/user-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. User Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/user_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Migration — up_users → users + user_roles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/directory-album-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Directory & Album Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/directory_album_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Directory → CollectionType &amp; Album → Collection or Postcard migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/tags-facet-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Tags Facet Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/tags_facet_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tag → FacetType 'Experience' migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/postcard-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. Postcard Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/postcard_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Postcard migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/journey-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Journey Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/journey_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Journey (property-itinerary) migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/cityguide-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. City Guide Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/cityguide_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    City Guide migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/bookmark-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. Bookmark Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/bookmark_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bookmark migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Change Plan
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Schema Change Plan
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implementation Report & Runbook
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implementation Report & Runbook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-how-the-open-decisions-were-resolved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. How the open decisions were resolved
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. How the open decisions were resolved">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#extra-decisions-the-plan-did-not-anticipate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extra decisions the plan did not anticipate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#product-decision-on-the-d5-fields-2026-08-17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Product decision on the D5 fields (2026-08-17)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-schema-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Schema changes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Schema changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-enums" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Enums
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-facet-nomenclature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Facet nomenclature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-migrations-squashed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 Migrations squashed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-runbook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Runbook
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Runbook">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-build-the-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Build the database
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-load-the-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Load the data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-start-over" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Start over
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-rendering-a-cluster-page-there-is-no-entry-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 Rendering a cluster page (there is no entry table)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-verified-load-counts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Verified load counts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Verified load counts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#known-skips-all-reported-by-the-scripts-none-silent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known skips (all reported by the scripts, none silent)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-data-deliberately-not-migrated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Data deliberately not migrated
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-still-outstanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Still outstanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../00-cross-cutting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    00. Cross-cutting Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-seed-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01. Seed Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02. Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-media/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03. Media
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-company/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04. Company
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-users/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05. Users
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-directory-album/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06. Directory & Album
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-tags-facet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07. Tags Facet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-postcard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08. Postcard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-journey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09. Journey
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-cityguide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. City Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11-bookmark/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11. Bookmark
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12-category-environment-facet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12. Category & Environment Facet — NEW
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-not-yet-scripted/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13. Not Yet Scripted
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-how-the-open-decisions-were-resolved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. How the open decisions were resolved
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. How the open decisions were resolved">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#extra-decisions-the-plan-did-not-anticipate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extra decisions the plan did not anticipate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#product-decision-on-the-d5-fields-2026-08-17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Product decision on the D5 fields (2026-08-17)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-schema-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Schema changes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Schema changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-enums" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Enums
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-facet-nomenclature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Facet nomenclature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-migrations-squashed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 Migrations squashed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-runbook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Runbook
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Runbook">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-build-the-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Build the database
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-load-the-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Load the data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-start-over" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Start over
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-rendering-a-cluster-page-there-is-no-entry-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 Rendering a cluster page (there is no entry table)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-verified-load-counts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Verified load counts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Verified load counts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#known-skips-all-reported-by-the-scripts-none-silent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known skips (all reported by the scripts, none silent)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-data-deliberately-not-migrated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Data deliberately not migrated
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-still-outstanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Still outstanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="implementation-report-runbook">Implementation Report &amp; Runbook</h1>
+<p>The <a href="../">Schema Change Plan</a> is <strong>implemented</strong>. This page records every
+change made, the evidence behind each decision, and how to rebuild the database
+from scratch.</p>
+<p><strong>Verification status:</strong> the full 13-step pipeline was executed end-to-end
+against a throwaway database (<code>postcardv2_schemacheck</code>, created and dropped) on
+2026-08-17, loading live production CMS data. Every step completed; the counts
+in <a href="#4-verified-load-counts">§4</a> are that run's output. The scratch database and
+its unsuffixed map files were removed afterwards. <strong>No existing database was
+modified.</strong></p>
+<hr />
+<h2 id="1-how-the-open-decisions-were-resolved">1. How the open decisions were resolved</h2>
+<p>Every <code>D*</code> decision was settled by querying the live Strapi API rather than
+guessing. Three of them contradicted the tracker, and the data won.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Decision</th>
+<th>Evidence</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>D1</strong></td>
+<td><code>Country.continent</code> enum values</td>
+<td>Legacy stores 2-letter codes: <code>AS</code> 57, <code>AF</code> 57, <code>EU</code> 50, <code>NA</code> 37, <code>OC</code> 25, <code>SA</code> 14, <code>AN</code> 5, null 20</td>
+<td>Enum <code>Continent { africa, antarctica, asia, europe, north_america, oceania, south_america }</code>; script maps the codes</td>
+</tr>
+<tr>
+<td><strong>D2</strong></td>
+<td>Media <code>BigInt</code> vs <code>UUID</code></td>
+<td>UUID would cascade to 10 FKs across 7 tables; the tracker's actual requirement is "a permanent old→new mapping"</td>
+<td><strong>Kept <code>BigInt</code></strong>, added <code>media.legacy_id</code> (unique). It <em>is</em> the mapping, and it is a stronger idempotency key than <code>url</code></td>
+</tr>
+<tr>
+<td><strong>D3</strong></td>
+<td><code>UserType.is_default</code> dropped by tracker, but required by <code>users.py</code></td>
+<td>Legacy has all three flags populated (<code>Regular</code> is <code>isDefault</code>); the canonical doc keeps them</td>
+<td><strong>Kept all three.</strong> Tracker deviation documented — dropping <code>is_default</code> would break role assignment with no replacement</td>
+</tr>
+<tr>
+<td><strong>D4</strong></td>
+<td>Where does v1 store Free/StarLife?</td>
+<td><code>isLoyaltyMember</code> is <strong>NULL on all 3371 users</strong></td>
+<td><strong>No v1 source exists.</strong> Every user gets one <code>free</code>/<code>active</code> membership row (matches the old <code>tier</code> default). Toggle via <code>SEED_FREE_MEMBERSHIP</code></td>
+</tr>
+<tr>
+<td><strong>D5</strong></td>
+<td>Are <code>media_kit</code>/<code>additionalInfo</code>/<code>sustainability</code>/<code>status</code>/<code>priority</code>/<code>company</code> really absent from v1 Album?</td>
+<td><strong>They are all present and populated</strong>: media_kit 1461, additionalInfo 1406, sustainability 47, status 1728, priority 2833, company 324, signature 946</td>
+<td><strong>Tracker was wrong</strong> (partial schema paste) — but see the product decision below: <code>media_kit</code> and <code>additionalInfo</code> are dropped anyway, <code>sustainability</code> is renamed to <code>about</code>, and <code>status</code>/<code>priority</code>/<code>company</code> are kept and migrated</td>
+</tr>
+<tr>
+<td><strong>D6</strong></td>
+<td>How does <code>FacetType</code> scope to a SubcollectionType?</td>
+<td><code>property_itineraries</code> carry <strong>no</strong> category/environment relation — Journey 'Theme' has no legacy data</td>
+<td>Added nullable <code>applies_to_subcollection_type_id</code> + <code>FacetOwnedType.subcollection</code> so the CMS can start collecting it. Nothing seeded or assigned</td>
+</tr>
+<tr>
+<td><strong>D7</strong></td>
+<td>Environment FacetType names ("TBD")</td>
+<td>Read the actual values per directory — see <a href="#24-facet-nomenclature">§2.4</a></td>
+<td><code>Setting</code> / <code>Venue Type</code> / <code>Format</code> / <code>Department</code></td>
+</tr>
+<tr>
+<td><strong>D8</strong></td>
+<td>Does <code>CollectionCluster</code> keep <code>locality_id</code>?</td>
+<td>City guides carry only <code>region</code> + <code>country</code></td>
+<td><strong>Dropped</strong> <code>locality_id</code> and <code>city_id</code></td>
+</tr>
+<tr>
+<td><strong>D9</strong></td>
+<td>Delete <code>collection_cluster_entries</code>?</td>
+<td>Tracker: "fully derived, not curated… there is NO join/entry table". Derived rows were also never deleted, needing manual pruning</td>
+<td><strong>Deleted</strong> the table and enum. Added <code>collection_cluster_types.match_field</code>; <code>cityguide.py</code> now <em>previews</em> membership instead of materialising it</td>
+</tr>
+<tr>
+<td><strong>D10</strong></td>
+<td>Drop the <code>Postcard ↔ Tag</code> M2M?</td>
+<td>Nothing populated it; legacy tags become Experience facet values</td>
+<td><strong>Dropped</strong> (<code>_PostcardTags</code> table gone)</td>
+</tr>
+<tr>
+<td><strong>D11</strong></td>
+<td><code>UserEvent.search_query</code> — String or Json?</td>
+<td><code>searchData</code> is <strong>null on every sampled event</strong> (0/3000); <code>meta</code> likewise</td>
+<td><strong>Kept <code>String?</code></strong> — nothing to lose. <code>UserEventType</code> widened to cover the 12 real <code>event_master</code> codes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="extra-decisions-the-plan-did-not-anticipate">Extra decisions the plan did not anticipate</h3>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Evidence</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Is Restaurants' <code>Cuisine/Type</code> one facet or two?</td>
+<td>Category = cuisines (<em>Awadhi cuisine</em>, <em>Seafood</em>); Environment = venue kinds (<em>Bar</em>, <em>Bakery</em>)</td>
+<td><strong>Two facets</strong> — <code>Cuisine</code> from Category, <code>Venue Type</code> from Environment</td>
+</tr>
+<tr>
+<td>Would the album→postcard split lose data?</td>
+<td>R/E/S albums: <code>signature</code> on <strong>672/673</strong>, but media_kit/additionalInfo/sustainability all <strong>0</strong></td>
+<td>Added <code>postcards.signature</code> only. The other three would be dead columns</td>
+</tr>
+<tr>
+<td>Is <code>album.cuisines</code> really F&amp;B-only?</td>
+<td>Shopping albums use it too — <code>shopping-type</code> averages 2.2 values per album</td>
+<td><strong>All four Category facets are <code>allows_multiple</code></strong>; Environment facets stay single-select. Single-select violations went 187 → <strong>0</strong></td>
+</tr>
+<tr>
+<td>Where do legacy follow-tags point?</td>
+<td>Legacy tags become <code>facet_values</code>, not the v2 <code>tags</code> table</td>
+<td>Added <code>CircleOwnedType.facet_value</code>. Using <code>tag</code> would have pointed at the wrong table</td>
+</tr>
+<tr>
+<td>Multi-directory albums (tracker wanted a rule)</td>
+<td><strong>0</strong> albums have more than one directory</td>
+<td>Rule recorded as "lowest legacy directory id wins" and now logged, not silent</td>
+</tr>
+</tbody>
+</table>
+<h3 id="product-decision-on-the-d5-fields-2026-08-17">Product decision on the D5 fields (2026-08-17)</h3>
+<p>D5 established that all six fields exist in v1. Product then confirmed which of
+them v2 actually needs. Because the database is rebuilt from scratch, dropping
+them costs nothing.</p>
+<table>
+<thead>
+<tr>
+<th>Legacy field</th>
+<th>v1 rows</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>media_kit</code></td>
+<td>1461</td>
+<td><strong>Dropped</strong> — no longer used by the app; no v2 column</td>
+</tr>
+<tr>
+<td><code>additionalInfo</code></td>
+<td>1406</td>
+<td><strong>Dropped</strong> — same</td>
+</tr>
+<tr>
+<td><code>sustainability</code></td>
+<td>47</td>
+<td><strong>Kept, renamed to <code>collections.about</code></strong> — the field holds general "about" copy, not a sustainability-only block</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>1728</td>
+<td>Kept and migrated (already the v2 vocabulary)</td>
+</tr>
+<tr>
+<td><code>priority</code></td>
+<td>2833</td>
+<td>Kept and migrated</td>
+</tr>
+<tr>
+<td><code>company</code></td>
+<td>324</td>
+<td>Kept and migrated (<code>managed_by_company_id</code>)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-schema-changes">2. Schema changes</h2>
+<p><code>schema/schema.prisma</code> — <strong>32 tables</strong> (was 36).</p>
+<h3 id="21-models">2.1 Models</h3>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Model</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Deleted</strong></td>
+<td><code>City</code></td>
+<td>R1 — tier removed</td>
+</tr>
+<tr>
+<td><strong>Deleted</strong></td>
+<td><code>CollectionClusterEntry</code></td>
+<td>R6/D9 — membership is derived</td>
+</tr>
+<tr>
+<td><strong>Deleted</strong></td>
+<td><code>Example</code></td>
+<td>Vestigial scaffold</td>
+</tr>
+<tr>
+<td><strong>Deleted</strong></td>
+<td><code>_PostcardTags</code> (implicit M2M)</td>
+<td>D10 — duplicate classification path</td>
+</tr>
+<tr>
+<td><strong>Added</strong></td>
+<td><code>Membership</code></td>
+<td>R2 — tier history/expiry</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-enums">2.2 Enums</h3>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Enum</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Added</strong></td>
+<td><code>Continent</code>, <code>MembershipTier</code>, <code>MembershipStatus</code>, <code>JourneyStatus</code>, <code>PriceType</code>, <code>EnquiryStatus</code>, <code>EnquirySubjectType</code></td>
+</tr>
+<tr>
+<td><strong>Deleted</strong></td>
+<td><code>UserTier</code>, <code>ClusterEntryType</code></td>
+</tr>
+<tr>
+<td><strong>Changed</strong></td>
+<td><code>CircleRelationship</code> — dropped <code>author</code>, <code>assigned_staff</code>, <code>owner</code> (R3)</td>
+</tr>
+<tr>
+<td><strong>Changed</strong></td>
+<td><code>CircleOwnedType</code> — added <code>facet_value</code></td>
+</tr>
+<tr>
+<td><strong>Changed</strong></td>
+<td><code>FacetOwnedType</code> — added <code>subcollection</code></td>
+</tr>
+<tr>
+<td><strong>Changed</strong></td>
+<td><code>UserEventType</code> — widened to the 12 legacy <code>event_master</code> codes plus v2-native events</td>
+</tr>
+</tbody>
+</table>
+<h3 id="23-columns">2.3 Columns</h3>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Dropped</th>
+<th>Added</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>countries</code></td>
+<td>—</td>
+<td><code>code</code>, <code>continent</code>, <code>flag_media_id</code></td>
+</tr>
+<tr>
+<td><code>regions</code></td>
+<td>—</td>
+<td><code>lat</code>, <code>lng</code> (replacing the lost City centroid)</td>
+</tr>
+<tr>
+<td><code>localities</code></td>
+<td><code>city_id</code></td>
+<td><code>region_id</code>, <code>google_place_id</code> (unique), <code>lat</code>, <code>lng</code></td>
+</tr>
+<tr>
+<td><code>media</code></td>
+<td>—</td>
+<td><code>legacy_id</code> (unique), <code>name</code>, <code>caption</code>, <code>ext</code>, <code>hash</code>, <code>size</code>, <code>provider</code>, <code>preview_url</code>, <code>provider_metadata</code></td>
+</tr>
+<tr>
+<td><code>companies</code></td>
+<td>—</td>
+<td><code>cover_image_media_id</code>; renamed <code>name</code>→<code>title</code>, <code>icon_media_id</code>→<code>logo_media_id</code></td>
+</tr>
+<tr>
+<td><code>user_types</code></td>
+<td>—</td>
+<td>renamed <code>name</code>→<code>title</code></td>
+</tr>
+<tr>
+<td><code>users</code></td>
+<td><code>city_id</code>, <code>tier</code></td>
+<td><code>city_name</code></td>
+</tr>
+<tr>
+<td><code>collections</code></td>
+<td><code>city_id</code>, <code>media_kit</code>, <code>additional_info</code></td>
+<td><code>signature</code>, <code>gallery</code>, <code>owner_user_id</code>, <code>assigned_to_user_id</code>; renamed <code>sustainability</code>→<code>about</code></td>
+</tr>
+<tr>
+<td><code>postcards</code></td>
+<td><code>city_id</code></td>
+<td><code>user_id</code>, <code>signature</code>, <code>seo</code>, <code>location</code>, <code>is_founder_story</code></td>
+</tr>
+<tr>
+<td><code>subcollections</code></td>
+<td><code>price_starting_at</code>, <code>guests_min</code>, <code>guests_max</code></td>
+<td><code>price_type</code>, <code>number_of_rooms</code>, <code>guests_per_room</code>, <code>day_wise_itinerary</code>, <code>terms_and_conditions</code>, <code>created_by_user_id</code>; <code>status</code> → <code>JourneyStatus</code></td>
+</tr>
+<tr>
+<td><code>collection_cluster_types</code></td>
+<td>—</td>
+<td><code>match_field</code></td>
+</tr>
+<tr>
+<td><code>collection_clusters</code></td>
+<td><code>city_id</code>, <code>locality_id</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>memories</code></td>
+<td><code>city_id</code></td>
+<td><code>collection_id</code>, <code>internal_url</code>, <code>signature</code></td>
+</tr>
+<tr>
+<td><code>enquiries</code></td>
+<td><code>subcollection_id</code></td>
+<td><code>subject_type</code>, <code>subject_id</code>, <code>start_date</code>, <code>end_date</code>, <code>number_of_travelers</code>, <code>assigned_to_user_id</code>; <code>status</code> → <code>EnquiryStatus</code></td>
+</tr>
+<tr>
+<td><code>responses</code></td>
+<td>—</td>
+<td><code>user_id</code> made <strong>nullable</strong> (ContactUs accepts logged-out submissions)</td>
+</tr>
+<tr>
+<td><code>circles</code></td>
+<td>—</td>
+<td>index <code>(user_id, owned_type)</code> — the locked query pattern</td>
+</tr>
+<tr>
+<td><code>user_roles</code></td>
+<td>—</td>
+<td>unique <code>(user_id, user_type_id)</code> — makes the upsert idempotent</td>
+</tr>
+</tbody>
+</table>
+<p><code>collections</code> keeps <code>status</code>, <code>priority</code> and <code>managed_by_company_id</code>, and carries
+the old <code>sustainability</code> copy as <code>about</code>. <code>media_kit</code> and <code>additional_info</code> have
+no v2 column — see <strong>D5</strong> and the product decision above.</p>
+<h3 id="24-facet-nomenclature">2.4 Facet nomenclature</h3>
+<p>Resolved from the live values, not invented:</p>
+<table>
+<thead>
+<tr>
+<th>Collection type</th>
+<th>Category facet</th>
+<th>Environment facet</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Properties</td>
+<td><strong>Type</strong> (<em>Eco-Lodge, Glamping, Villas</em>)</td>
+<td><strong>Setting</strong> (<em>City, Farm, Jungle, Desert</em>)</td>
+</tr>
+<tr>
+<td>Restaurants</td>
+<td><strong>Cuisine</strong> (<em>Awadhi, Seafood, Coffee</em>)</td>
+<td><strong>Venue Type</strong> (<em>Bar, Bakery, Speakeasy</em>)</td>
+</tr>
+<tr>
+<td>Events</td>
+<td><strong>Category</strong> (<em>Cocktail Tasting, Gin, Techno</em>)</td>
+<td><strong>Format</strong> (<em>Supper Club, Chef Takeover</em>)</td>
+</tr>
+<tr>
+<td>Shopping</td>
+<td><strong>Type</strong> (<em>Sustainable, Handmade, Jewellery</em>)</td>
+<td><strong>Department</strong> (<em>Fashion, Home Decor, Books</em>)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="25-migrations-squashed">2.5 Migrations squashed</h3>
+<p>The nine incremental migrations were replaced by a single baseline,
+<code>schema/migrations/20260817090000_v2_baseline/migration.sql</code> (922 lines). This
+is correct because the database is rebuilt from scratch, and it removes the
+retracted <code>20260806060000_add_subcollection_price_starting_at</code> cleanly rather
+than layering a revert on top.</p>
+<blockquote>
+<p>⚠️ The existing <code>production</code> database still carries the old 9-migration
+history. It <strong>cannot</strong> be migrated forward onto this baseline — it must be
+dropped and rebuilt (see <a href="#3-runbook">§3</a>). Nothing in this change set was
+applied to it.</p>
+</blockquote>
+<hr />
+<h2 id="3-runbook">3. Runbook</h2>
+<h3 id="31-prerequisites">3.1 Prerequisites</h3>
+<p><code>.env</code> in the project root:</p>
+<div class="highlight"><pre><span></span><code>CMS_BASE_URL=https://api-prod.postcard.travel
+CMS_API_TOKEN=...
+DATABASE_URL=postgres://user:pass@127.0.0.1:5432/postcardv2
+CMS_ADMIN_EMAIL=...          # /api/users strips emails; the admin API is required
+CMS_ADMIN_PASSWORD=...
+</code></pre></div>
+<p><code>ENV_SUFFIX</code> for the id-map files is derived from the <strong>database name</strong> in
+<code>DATABASE_URL</code>: <code>development</code> → <code>_dev</code>, <code>production</code> → <code>_prod</code>, anything else →
+no suffix.</p>
+<h3 id="32-build-the-database">3.2 Build the database</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. create an empty database (psql, or your tool of choice)</span>
+createdb<span class="w"> </span>postcardv2
+
+<span class="c1"># 2. apply the baseline schema</span>
+npm<span class="w"> </span>run<span class="w"> </span>migrate:deploy<span class="w">        </span><span class="c1"># prisma migrate deploy</span>
+npm<span class="w"> </span>run<span class="w"> </span>generate<span class="w">              </span><span class="c1"># prisma client (only if the app needs it)</span>
+</code></pre></div>
+<p>To rebuild an existing database instead:</p>
+<div class="highlight"><pre><span></span><code>npm<span class="w"> </span>run<span class="w"> </span>migrate:reset<span class="w">         </span><span class="c1"># DROPS EVERYTHING, re-applies the baseline</span>
+</code></pre></div>
+<h3 id="33-load-the-data">3.3 Load the data</h3>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>scripts/migrate_data.py
+</code></pre></div>
+<p>Thirteen steps, each its own process; the pipeline stops on the first failure
+and tells you how to resume:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>scripts/migrate_data.py<span class="w"> </span>--from<span class="w"> </span>postcard.py<span class="w">    </span><span class="c1"># resume from a step</span>
+python<span class="w"> </span>scripts/migrate_data.py<span class="w"> </span>--only<span class="w"> </span>cityguide.py<span class="w">   </span><span class="c1"># run one step</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Step</th>
+<th>Produces</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>seed.py</code></td>
+<td>collection/subcollection/cluster types, persona tags, response forms</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>geo_migration.py</code></td>
+<td>countries → regions → localities</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>media.py</code></td>
+<td>media (keyed on <code>legacy_id</code>)</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>company.py</code></td>
+<td>companies → <code>legacy_company_id_map</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>users.py</code></td>
+<td>user_types, users, memberships, user_roles → <code>legacy_user_id_map</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>directory_album.py</code></td>
+<td>collection_types, collections, postcards → <code>legacy_album_id_map</code>, <code>legacy_album_postcard_id_map</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>tags_facet.py</code></td>
+<td>FacetType 'Experience' + values → <code>legacy_tag_id_map</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>postcard.py</code></td>
+<td>postcards + Experience assignments → <code>legacy_postcard_id_map</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>journey.py</code></td>
+<td>subcollections + ordered postcards → <code>legacy_itinerary_id_map</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>category_environment_facet.py</code></td>
+<td>8 facet types, values, assignments → <code>legacy_category_id_map</code>, <code>legacy_environment_id_map</code></td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>cityguide.py</code></td>
+<td>collection_clusters → <code>legacy_cityguide_id_map</code></td>
+</tr>
+<tr>
+<td>12</td>
+<td><code>bookmark.py</code></td>
+<td>circles (postcard)</td>
+</tr>
+<tr>
+<td>13</td>
+<td><code>follows.py</code></td>
+<td>circles (user, collection, postcard, company, facet_value, cluster)</td>
+</tr>
+</tbody>
+</table>
+<p>Order matters — steps 6–13 consume the map files written by earlier steps.</p>
+<h3 id="34-start-over">3.4 Start over</h3>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>scripts/truncate_all.py<span class="w"> </span>--yes<span class="w">    </span><span class="c1"># empties every table, keeps the schema</span>
+python<span class="w"> </span>scripts/migrate_data.py
+</code></pre></div>
+<p>Every step is idempotent (upsert on a natural key), so re-running without
+truncating is also safe.</p>
+<h3 id="35-rendering-a-cluster-page-there-is-no-entry-table">3.5 Rendering a cluster page (there is no entry table)</h3>
+<p><code>collection_cluster_entries</code> no longer exists. Membership is a query driven by
+the cluster type's <code>collection_type_ids</code> + <code>match_field</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="c1">-- City Guide: match_field = 'region_id'</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">postcards</span><span class="w"> </span><span class="n">p</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">collection_clusters</span><span class="w"> </span><span class="n">cc</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">cc</span><span class="p">.</span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">:</span><span class="n">cluster_id</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">collection_cluster_types</span><span class="w"> </span><span class="n">cct</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">cct</span><span class="p">.</span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cc</span><span class="p">.</span><span class="n">cluster_type_id</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">collection_type_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">ANY</span><span class="p">(</span><span class="n">cct</span><span class="p">.</span><span class="n">collection_type_ids</span><span class="p">)</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">region_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cc</span><span class="p">.</span><span class="n">region_id</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'live'</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">collection_id</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span><span class="p">;</span>
+</code></pre></div>
+<p><code>cityguide.py</code> prints exactly this resolution at the end of its run as a sanity
+check, without writing anything.</p>
+<hr />
+<h2 id="4-verified-load-counts">4. Verified load counts</h2>
+<p>From the end-to-end run against live production CMS data:</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Rows</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>countries</code></td>
+<td>265</td>
+<td>215 with code, 245 with continent, 132 with flag</td>
+</tr>
+<tr>
+<td><code>regions</code></td>
+<td>1183</td>
+<td>3 legacy rows have no country → reported</td>
+</tr>
+<tr>
+<td><code>localities</code></td>
+<td>288</td>
+<td>now parented to region; 2 same-name-in-region collapsed</td>
+</tr>
+<tr>
+<td><code>media</code></td>
+<td>16 287</td>
+<td>all with <code>legacy_id</code>; 0 skipped</td>
+</tr>
+<tr>
+<td><code>companies</code></td>
+<td>210</td>
+<td>99 legacy rows have <code>name: null</code> (verified empty shells)</td>
+</tr>
+<tr>
+<td><code>users</code></td>
+<td>3356</td>
+<td>0 skipped</td>
+</tr>
+<tr>
+<td><code>memberships</code></td>
+<td>3356</td>
+<td>all <code>free</code> — no legacy StarLife source (D4)</td>
+</tr>
+<tr>
+<td><code>user_roles</code></td>
+<td>3356</td>
+<td>across 11 role types</td>
+</tr>
+<tr>
+<td><code>collections</code></td>
+<td>2102</td>
+<td>Properties only; 292 owner, 1440 assignee, 266 signature, ~20 <code>about</code></td>
+</tr>
+<tr>
+<td><code>postcards</code></td>
+<td>6894</td>
+<td>673 album-derived (672 with signature) + 6221 legacy</td>
+</tr>
+<tr>
+<td><code>subcollections</code></td>
+<td>24</td>
+<td><strong>7 per_person / 10 twin_sharing</strong> — previously all migrated as per-person</td>
+</tr>
+<tr>
+<td><code>subcollection_postcards</code></td>
+<td>172</td>
+<td>0 invariant violations</td>
+</tr>
+<tr>
+<td><code>facet_types</code></td>
+<td>9</td>
+<td>Experience + 4 Category + 4 Environment</td>
+</tr>
+<tr>
+<td><code>facet_values</code></td>
+<td>1140</td>
+<td>718 Experience, 312 Category, 110 Environment</td>
+</tr>
+<tr>
+<td><code>facet_assignments</code></td>
+<td>9604</td>
+<td>520 collection, 9084 postcard, <strong>0 orphans, 0 single-select violations</strong></td>
+</tr>
+<tr>
+<td><code>collection_clusters</code></td>
+<td>9</td>
+<td>all resolve to a region; derive 601 postcards between them</td>
+</tr>
+<tr>
+<td><code>circles</code></td>
+<td>2139</td>
+<td>1166 postcard, 460 company, 444 collection, 34 user, 25 cluster, 10 facet_value</td>
+</tr>
+</tbody>
+</table>
+<h3 id="known-skips-all-reported-by-the-scripts-none-silent">Known skips (all reported by the scripts, none silent)</h3>
+<ul>
+<li><strong>326</strong> postcards + <strong>59</strong> albums under Designer Tours — they belong to the
+  Destination Expert / dx-card migration, which does not exist yet.</li>
+<li><strong>146</strong> legacy postcards with no name; <strong>99</strong> companies with a null name.</li>
+<li><strong>252</strong> bookmarks and <strong>130</strong> orphan bookmarks pointing at unmigrated or
+  missing postcards.</li>
+<li><strong>84</strong> follow-affiliate rows — Partner Affiliation clusters are not migrated
+  yet, so there is no cluster id to point at. Counted and reported by
+  <code>follows.py</code>, not written.</li>
+<li><strong>12</strong> albums whose region name did not resolve, <strong>15</strong> with an ambiguous
+  locality (<code>Shanti Nagar</code> exists twice), <strong>6</strong> with an unmatched company.</li>
+</ul>
+<hr />
+<h2 id="5-data-deliberately-not-migrated">5. Data deliberately not migrated</h2>
+<p>Verified empty in production, so nothing is lost:
+<code>Country.otherNames</code>, <code>Postcard.articleURL</code>, <code>Album.album_themes</code>,
+<code>Album.fixedDates</code>, <code>Album.placeId</code>, <code>Album.locationLink</code>,
+<code>UserEvent.searchData</code>, <code>UserEvent.meta</code>, <code>property_itinerary.best_time_to_visits</code>
+(the legacy <code>Month</code> collection has 0 rows), <code>property_itinerary.createdByUser</code>.</p>
+<p>Real data with no v2 home — <strong>archived, not migrated</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Rows</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Album.media_kit</code></td>
+<td>1461</td>
+<td>Dropped by product decision — no longer used by the app</td>
+</tr>
+<tr>
+<td><code>Album.additionalInfo</code></td>
+<td>1406</td>
+<td>Dropped by product decision — no longer used by the app</td>
+</tr>
+<tr>
+<td><code>Album.news_article</code></td>
+<td>287</td>
+<td>Editorial press links (title/description/link/publishedDate)</td>
+</tr>
+<tr>
+<td><code>Album.on_boarding</code></td>
+<td>2826</td>
+<td>Internal partner-onboarding workflow state</td>
+</tr>
+<tr>
+<td><code>Album.bestMonth</code></td>
+<td>3</td>
+<td>Superseded by the Journey <code>best_months</code> component</td>
+</tr>
+<tr>
+<td><code>Album.tourInfo</code> / <code>avgPricePerPerson</code> / <code>pricesStartingAt</code> / <code>numberOfGuests*</code></td>
+<td>≤129</td>
+<td>Journey fields that belong to <code>property_itineraries</code></td>
+</tr>
+<tr>
+<td><code>Destination-expert.quotes</code> / <code>founderMessage</code> / <code>dxSections</code></td>
+<td>20</td>
+<td>Tracker: "archived as-is, no structured target"</td>
+</tr>
+<tr>
+<td><code>Event.ipAddress</code> / <code>ipCountry</code> / <code>url</code> / <code>podcast</code></td>
+<td>51 696</td>
+<td>Tracker: "ignored, not migrated"</td>
+</tr>
+<tr>
+<td><code>Memory.album</code> / <code>dx_card</code> anchors</td>
+<td>44</td>
+<td>Schema now supports them (<code>memories.collection_id</code>); the Memory migration itself is not written yet</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-still-outstanding">6. Still outstanding</h2>
+<p>Not blockers for the rebuild, but the plan flags them:</p>
+<ol>
+<li><strong>No migration script exists yet</strong> for <code>memories</code> (176), <code>user_events</code>
+   (51 696), <code>enquiries</code> (0 — v2-native), Destination Expert (20), Dx-card
+   (497) or Travelogue (22). The schema supports all of them.</li>
+<li><strong>Designer Tours</strong> content is skipped everywhere pending that Destination
+   Expert work — 385 rows in total.</li>
+<li><strong><code>localities.google_place_id</code></strong> is the intended uniqueness key but has no
+   legacy source. <code>(name, region_id)</code> is the load-time key until the Gmap
+   Address Enrichment workstream populates it.</li>
+<li><strong>Location components</strong> carry only <code>lat</code>/<code>lng</code> from legacy. <code>address</code>,
+   <code>route</code>, <code>postal_code</code>, <code>google_place_id</code> etc. are Gmap enrichment outputs.</li>
+<li><strong>Membership tiers</strong> are uniformly <code>free</code> (D4) — a StarLife source must be
+   found or the tiers set by hand.</li>
+<li><strong>Notebooks</strong> in <code>notebooks/</code> still contain the old author/assigned_staff
+   Circle sections, which R3 makes wrong. Per the repo rule those changes must
+   be delivered as paste-able cell snippets, not direct <code>.ipynb</code> edits — not
+   done in this pass.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

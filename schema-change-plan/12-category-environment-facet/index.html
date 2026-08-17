@@ -1,0 +1,2484 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Strapi → PostgreSQL/Prisma migration documentation for Postcard Travel Club">
+      
+      
+      
+      
+        <link rel="prev" href="../11-bookmark/">
+      
+      
+        <link rel="next" href="../13-not-yet-scripted/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>12. Category & Environment Facet — NEW - Postcard Migration Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#12-new-script-category_environment_facetpy" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Postcard Migration Docs" class="md-header__button md-logo" aria-label="Postcard Migration Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Postcard Migration Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              12. Category & Environment Facet — NEW
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Postcard Migration Docs" class="md-nav__button md-logo" aria-label="Postcard Migration Docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Postcard Migration Docs
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prerequisites
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Prerequisites
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/postgresql-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PostgreSQL Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../prerequisites/prisma-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prisma Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../get-started/initialisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Initialisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../get-started/seed-scripts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Seed Scripts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../get-started/migration-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migration Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../migrations/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrations
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Migrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/geo-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Geo Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/geo_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo Migration — Country / Region / City / Locality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/media-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. Media Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/company-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. Company Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/media_usertypes_companies_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Media / User Types / Companies Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/user-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. User Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/user_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Migration — up_users → users + user_roles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/directory-album-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Directory & Album Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/directory_album_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Directory → CollectionType &amp; Album → Collection or Postcard migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/tags-facet-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Tags Facet Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/tags_facet_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tag → FacetType 'Experience' migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/postcard-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. Postcard Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/postcard_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Postcard migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/journey-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Journey Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/journey_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Journey (property-itinerary) migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/cityguide-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. City Guide Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/cityguide_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    City Guide migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/bookmark-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. Bookmark Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../migrations/notebooks/bookmark_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bookmark migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Change Plan
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Schema Change Plan
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../implementation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implementation Report & Runbook
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../00-cross-cutting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    00. Cross-cutting Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-seed-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01. Seed Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02. Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-media/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03. Media
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-company/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04. Company
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-users/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05. Users
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-directory-album/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06. Directory & Album
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-tags-facet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07. Tags Facet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-postcard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08. Postcard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-journey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09. Journey
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-cityguide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. City Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11-bookmark/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11. Bookmark
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12. Category & Environment Facet — NEW
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12. Category & Environment Facet — NEW
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-one-script-not-two" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why one script, not two
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pipeline-position" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline position
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-facettypes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1 — FacetTypes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 1 — FacetTypes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#category-facettypes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Category FacetTypes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment-facettypes-decision-d7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment FacetTypes — decision D7
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decision-d6-journeytheme-has-nowhere-to-attach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚠️ Decision D6 — Journey/Theme has nowhere to attach
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-2-facetvalues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2 — FacetValues
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-facetassignments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3 — FacetAssignments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema-prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#proposed-script-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed script shape
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions-before-writing-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions before writing it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary-of-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary of actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-not-yet-scripted/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13. Not Yet Scripted
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-one-script-not-two" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why one script, not two
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pipeline-position" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline position
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-facettypes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1 — FacetTypes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 1 — FacetTypes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#category-facettypes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Category FacetTypes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment-facettypes-decision-d7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment FacetTypes — decision D7
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decision-d6-journeytheme-has-nowhere-to-attach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚠️ Decision D6 — Journey/Theme has nowhere to attach
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-2-facetvalues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2 — FacetValues
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-facetassignments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3 — FacetAssignments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema-prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#proposed-script-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed script shape
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions-before-writing-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions before writing it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary-of-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary of actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="12-new-script-category_environment_facetpy">12 — NEW SCRIPT: <code>category_environment_facet.py</code></h1>
+<p>Tables: <code>facet_types</code>, <code>facet_values</code>, <code>facet_assignments</code>.</p>
+<p>Tracker rows: <strong>Category → FacetType (scoped per CollectionType) / FacetValue /
+FacetAssignment</strong> and <strong>Environment → FacetType (scoped per CollectionType,
+name TBD) / FacetValue / FacetAssignment</strong>.</p>
+<p><strong>This is the answer to "prepare 1 more script for category and environment
+migration inside the facettype and facetvalue thing".</strong> Yes — and it should be
+<strong>one script covering both</strong>, because they are structurally identical: same
+transform, same scoping rule, same assignment rule. Only the FacetType naming
+differs.</p>
+<hr />
+<h2 id="why-one-script-not-two">Why one script, not two</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Category</th>
+<th>Environment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Value →</td>
+<td><code>FacetValue.name</code> / <code>.slug</code></td>
+<td><code>FacetValue.name</code></td>
+</tr>
+<tr>
+<td>Grouping →</td>
+<td><code>FacetType</code> scoped per CollectionType</td>
+<td><code>FacetType</code> scoped per CollectionType</td>
+</tr>
+<tr>
+<td>Assignment →</td>
+<td><code>FacetAssignment</code>, <code>owned_type</code> by CollectionType</td>
+<td><strong>"Same binding rule as Category"</strong></td>
+</tr>
+<tr>
+<td>FacetType names</td>
+<td>Confirmed 2026-08-05</td>
+<td><strong>TBD (D7)</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The tracker's Environment row says the naming is <em>"same family as Category's
+Type/Cuisine-Type/Theme/Category nomenclature"</em> and the binding is <em>"Same binding
+rule as Category"</em>. Two scripts would be two copies of one algorithm.</p>
+<hr />
+<h2 id="pipeline-position">Pipeline position</h2>
+<p>Between <code>tags_facet.py</code> (7) and <code>postcard.py</code> (8):</p>
+<div class="highlight"><pre><span></span><code><span class="n">STEPS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="o">...</span>
+    <span class="s2">"tags_facet.py"</span><span class="p">,</span>
+    <span class="s2">"category_environment_facet.py"</span><span class="p">,</span>   <span class="c1"># NEW — needs collections + postcards to exist</span>
+    <span class="s2">"postcard.py"</span><span class="p">,</span>
+    <span class="o">...</span>
+<span class="p">]</span>
+</code></pre></div>
+<p>⚠️ <strong>Ordering conflict.</strong> Assignments need <code>collections</code> (from step 6) <em>and</em>
+<code>postcards</code> (from step 8) to already exist — but step 8 runs <em>after</em>. Two ways
+out:</p>
+<ul>
+<li><strong>(a)</strong> Split into two passes: <strong>facet types + values</strong> before <code>postcard.py</code>,
+  <strong>assignments</strong> after. Cleanest.</li>
+<li><strong>(b)</strong> Run the whole script after <code>postcard.py</code> (position 9). Simpler, and
+  the facet values are not needed by <code>postcard.py</code> — it consumes only the
+  <em>Experience</em> map from <code>tags_facet.py</code>.</li>
+</ul>
+<p><strong>Recommend (b)</strong> — one script, positioned after <code>postcard.py</code>.</p>
+<hr />
+<h2 id="step-1-facettypes">Step 1 — FacetTypes</h2>
+<blockquote>
+<p>"CONFIRMED 2026-08-05: Properties → 'Type', Restaurants → 'Cuisine/Type',
+Journeys (Subcollection) → 'Theme', Events → 'Category', Shopping → 'Type'."</p>
+</blockquote>
+<h3 id="category-facettypes">Category FacetTypes</h3>
+<table>
+<thead>
+<tr>
+<th>Legacy <code>directory</code></th>
+<th>CollectionType</th>
+<th><code>FacetType.name</code></th>
+<th>slug</th>
+<th><code>allows_multiple</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mindful-luxury-hotels</code></td>
+<td>Properties</td>
+<td><code>Type</code></td>
+<td><code>property-type</code></td>
+<td>false (single-select)</td>
+</tr>
+<tr>
+<td><code>food-and-beverages</code></td>
+<td>Restaurants</td>
+<td><code>Cuisine</code> <em>(see below)</em></td>
+<td><code>cuisine</code></td>
+<td>true (multi-select)</td>
+</tr>
+<tr>
+<td><code>postcard-events</code></td>
+<td>Events</td>
+<td><code>Category</code></td>
+<td><code>event-category</code></td>
+<td>?</td>
+</tr>
+<tr>
+<td><code>postcard-shopping</code></td>
+<td>Shopping</td>
+<td><code>Type</code></td>
+<td><code>shopping-type</code></td>
+<td>?</td>
+</tr>
+<tr>
+<td><em>(Journey subcollection type)</em></td>
+<td>—</td>
+<td><code>Theme</code></td>
+<td><code>journey-theme</code></td>
+<td>?</td>
+</tr>
+</tbody>
+</table>
+<p>⚠️ <strong>"Cuisine/Type" is ambiguous</strong> — the tracker writes Restaurants as
+<code>Cuisine/Type</code> with a slash. That is either one facet named "Cuisine/Type", or
+two separate facets (<code>Cuisine</code> <strong>and</strong> <code>Type</code>) for Restaurants. Elsewhere the
+tracker treats Cuisine as its own thing (<em>"single-select (Property Type) vs
+multi-select (Cuisine)"</em> on the <code>FacetType.allows_multiple</code> comment). <strong>Confirm
+before implementing.</strong></p>
+<p>⚠️ <code>allows_multiple</code> per facet is only specified for two of them (Property Type =
+single, Cuisine = multi). The other three need a call.</p>
+<h3 id="environment-facettypes-decision-d7">Environment FacetTypes — <strong>decision D7</strong></h3>
+<blockquote>
+<p>"CLARIFIED 2026-08-05: same family as Category's Type/Cuisine-Type/Theme/
+Category nomenclature — <strong>names TBD</strong>."</p>
+</blockquote>
+<p>Nothing can be seeded until D7 is answered. A reasonable default, pending the
+decision: one <code>Setting</code> (or <code>Environment</code>) FacetType per CollectionType, e.g.
+<code>property-setting</code>, <code>restaurant-setting</code>. Values from the tracker's examples:
+<code>Beachfront</code>, <code>Mountain</code>, <code>Urban</code>.</p>
+<h3 id="decision-d6-journeytheme-has-nowhere-to-attach">⚠️ Decision D6 — Journey/Theme has nowhere to attach</h3>
+<p><code>FacetType.applies_to_collection_type_id</code> points at <code>collection_types</code>. Journey
+is a <strong>SubcollectionType</strong>. See <a href="../07-tags-facet/">07</a> for the three options.
+This blocks the <code>Theme</code> FacetType specifically; the other four are unaffected.</p>
+<hr />
+<h2 id="step-2-facetvalues">Step 2 — FacetValues</h2>
+<table>
+<thead>
+<tr>
+<th>v1 field</th>
+<th>v2 target</th>
+<th>Disposition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td><code>FacetValue.name</code></td>
+<td>Direct — <em>"The actual category value (e.g. 'Boutique Stay', 'Indian', 'Adventure')"</em></td>
+</tr>
+<tr>
+<td><code>slug</code></td>
+<td><code>FacetValue.slug</code></td>
+<td>Direct</td>
+</tr>
+<tr>
+<td><code>directory</code></td>
+<td><code>FacetType.applies_to_collection_type_id</code> + <code>FacetType.name</code></td>
+<td>Transform</td>
+</tr>
+</tbody>
+</table>
+<p>Environment's row lists only <code>name</code> (<em>"e.g. 'Beachfront', 'Mountain', 'Urban'"</em>)
+— no slug. Derive it with <code>slugify(name)</code> when v1 has none.</p>
+<p>ℹ️ Unlike <code>tags_facet.py</code> (which always derives the slug), Category has a real
+v1 <code>slug</code> field marked <strong>Direct</strong>. Carry it over, falling back to
+<code>slugify(name)</code>.</p>
+<p><code>@@unique([facetTypeId, slug])</code> already handles in-run dedupe, exactly as it does
+for tags. Duplicate names within a facet type merge; the same name under two
+different facet types stays distinct — which is what makes <code>Type</code> (Properties)
+and <code>Type</code> (Shopping) safely separate.</p>
+<hr />
+<h2 id="step-3-facetassignments">Step 3 — FacetAssignments</h2>
+<blockquote>
+<p>"CONFIRMED 2026-08-05 (Option A). RECONFIRMED 2026-08-12: still required on
+Collection even though trimmed out of the real Album schema paste — relation
+lives on the Category/FacetValue side."</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Source CollectionType</th>
+<th><code>owned_type</code></th>
+<th><code>owned_id</code> resolves via</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Properties</td>
+<td><code>collection</code></td>
+<td><code>legacy_album_id_map</code></td>
+</tr>
+<tr>
+<td>Destination Expert</td>
+<td><code>collection</code></td>
+<td><em>(dx-card migration — not yet built)</em></td>
+</tr>
+<tr>
+<td>Restaurants</td>
+<td><code>postcard</code></td>
+<td><code>legacy_album_postcard_id_map</code></td>
+</tr>
+<tr>
+<td>Events</td>
+<td><code>postcard</code></td>
+<td><code>legacy_album_postcard_id_map</code></td>
+</tr>
+<tr>
+<td>Shopping</td>
+<td><code>postcard</code></td>
+<td><code>legacy_album_postcard_id_map</code></td>
+</tr>
+<tr>
+<td>Journeys</td>
+<td><code>subcollection</code></td>
+<td><code>legacy_itinerary_id_map</code> — <strong>needs <code>FacetOwnedType.subcollection</code></strong></td>
+</tr>
+</tbody>
+</table>
+<p>This mirrors the album split exactly: albums of a dedicated type became
+collections, albums of a non-dedicated type became postcards, and the assignment
+follows the row wherever it landed. Both maps already exist. ✅</p>
+<p>The Dx-card row confirms the same treatment: <em>"category / environment →
+facet_value_id … Same Facet transform as Album."</em></p>
+<p>⚠️ <strong>Direction of the v1 relation is unconfirmed.</strong> The tracker says <em>"relation
+lives on the Category/FacetValue side"</em>, meaning v1 Category rows point at
+albums, not the reverse. So the script likely fetches <code>/api/categories</code> with
+<code>{"populate": "albums"}</code> (or similar) rather than reading a <code>category</code> field off
+each album. <strong>Needs the live v1 field list to confirm</strong> — the Album row does list
+<code>category</code> and <code>environment</code> as album fields, so both directions may be
+populated.</p>
+<hr />
+<h2 id="schema-prerequisites">Schema prerequisites</h2>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FacetOwnedType.subcollection</code></td>
+<td><a href="../07-tags-facet/">07</a> — for Journey/Theme</td>
+</tr>
+<tr>
+<td>FacetType scoping to a SubcollectionType (<strong>D6</strong>)</td>
+<td><a href="../07-tags-facet/">07</a></td>
+</tr>
+<tr>
+<td>Environment FacetType names (<strong>D7</strong>)</td>
+<td>this file</td>
+</tr>
+<tr>
+<td><code>legacy_album_id_map</code>, <code>legacy_album_postcard_id_map</code></td>
+<td>✅ <code>directory_album.py</code></td>
+</tr>
+<tr>
+<td><code>legacy_itinerary_id_map</code></td>
+<td>✅ <code>journey.py</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>No new tables or columns</strong> beyond the enum value and the D6 outcome —
+Category and Environment were deliberately folded into the existing facet model:</p>
+<blockquote>
+<p>"This is the single mechanism for sub-type classification (the earlier
+Category/CollectionCategory entities were removed as duplicates)."
+— schema comment on <code>FacetAssignment</code></p>
+</blockquote>
+<hr />
+<h2 id="proposed-script-shape">Proposed script shape</h2>
+<div class="highlight"><pre><span></span><code>category_environment_facet.py
+├── FACET_TYPES config          # (legacy directory slug, ct slug, facet name, slug, allows_multiple)
+│   ├── category facets         # confirmed 2026-08-05
+│   └── environment facets      # BLOCKED on D7
+├── upsert_facet_types()        # -&gt; {(kind, ct_slug): facet_type_id}
+├── migrate_values(kind)        # /api/categories, /api/environments -&gt; facet_values
+│                               #   carry v1 slug; slugify(name) fallback
+│                               #   dedupe via @@unique(facet_type_id, slug)
+├── assign(kind)                # -&gt; facet_assignments, owned_type by CollectionType
+│                               #   collection | postcard | subcollection
+├── save_maps()                 # legacy_category_id_map, legacy_environment_id_map
+└── verify()                    # counts per facet type; orphan assignments; dup slugs
+</code></pre></div>
+<p>Idempotent on the same keys as <code>tags_facet.py</code>: values upsert on
+<code>(facet_type_id, slug)</code>, assignments <code>ON CONFLICT DO NOTHING</code>.</p>
+<hr />
+<h2 id="open-questions-before-writing-it">Open questions before writing it</h2>
+<ol>
+<li><strong>D7</strong> — Environment FacetType names per CollectionType.</li>
+<li><strong>D6</strong> — how <code>FacetType</code> scopes to the Journey SubcollectionType.</li>
+<li>Is Restaurants' <code>Cuisine/Type</code> one facet or two?</li>
+<li><code>allows_multiple</code> for Events <code>Category</code>, Shopping <code>Type</code>, Journey <code>Theme</code>.</li>
+<li>Which side owns the v1 relation — Category→Album, or Album→Category?</li>
+<li>Do Journeys have a v1 category/environment source at all, or is <code>Theme</code> a
+   v2-only facet with no data to migrate?</li>
+</ol>
+<hr />
+<h2 id="summary-of-actions">Summary of actions</h2>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>NEW SCRIPT</strong></td>
+<td><code>scripts/category_environment_facet.py</code>, positioned after <code>postcard.py</code></td>
+</tr>
+<tr>
+<td><strong>ADD to</strong> <code>migrate_data.py</code></td>
+<td>new <code>STEPS</code> entry</td>
+</tr>
+<tr>
+<td><strong>ADD enum value</strong></td>
+<td><code>FacetOwnedType.subcollection</code> <em>(shared with <a href="../07-tags-facet/">07</a>)</em></td>
+</tr>
+<tr>
+<td><strong>DECISION D6</strong></td>
+<td>FacetType → SubcollectionType scoping</td>
+</tr>
+<tr>
+<td><strong>DECISION D7</strong></td>
+<td>Environment FacetType names</td>
+</tr>
+<tr>
+<td><strong>NO new tables</strong></td>
+<td>Category/Environment fold into the existing facet model</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
